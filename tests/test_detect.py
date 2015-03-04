@@ -296,10 +296,10 @@ class Test_BeepFlashTimingDetector(unittest.TestCase):
             ),
         }
         syncTimelineTickRate = 90000.0
-        wcSyncTimeCorrelations = {
-            "pre"  : (200000000, 50000), # (<wcNanos>, <syncTimelineTicks>),
-            "post" : (212024000, 51080), # (<wcNanos>, <syncTimelineTicks>),
-        }
+        wcSyncTimeCorrelations = [
+            (200000000, (200000000, 50000, 1.0)), # (<wcWhen>, (<wcNanos>, <syncTimelineTicks>, <speed>)),
+            (212024000, (212024000, 51080, 1.0)), # (<wcWhen>, (<wcNanos>, <syncTimelineTicks>, <speed>)),
+        ]
         wcDispersions = {
             "pre"  : (199000000, 0.5*1000000), # (<wcNanos>, <dispersionNanos>),
             "post" : (213024000, 0.5*1000000), # (<wcNanos>, <dispersionNanos>),

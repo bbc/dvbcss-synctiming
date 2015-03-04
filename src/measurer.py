@@ -94,13 +94,17 @@ class Measurer:
         
         :attribute syncTimelineClock the sync time line clock
         :attribute wallClock the wall clock
-        :return the correlation, a tuple (wall clock value, corresponding sync time line value)
-        
+        :returns: tuple (wcWhenSnapshotted, (wcTime, syncTime, speed) where:
+         * wcWhenSnapshotted is the wall clock time when the snapshot was taken
+         * wctime and syncTime are a correlation between wall clock and sync timeline time
+         * speed is the current speed of the sync timeline
         """
         syncTimeNow = self.syncTimelineClock.ticks
         # convert from pts to wallclock
         wcNow = self.syncTimelineClock.toOtherClockTicks(self.wallClock, syncTimeNow)
-        return (wcNow, syncTimeNow)
+        speed = self.syncTimelineClock.speed
+        whenSnapshotted = wcNow
+        return (whenSnapshotted, (wcNow, syncTimeNow, speed))
 
 
     def capture(self):
@@ -115,7 +119,7 @@ class Measurer:
                                         captureAndPackageIntoChannels(self.f, self.pinsToMeasure, self.pinMap, self.wallClock)
             self.wcAcReqResp = {"pre":timeDataPre, "post":timeDataPost}
             correlationPost = self.snapShot()
-            self.wcSyncTimeCorrelations = {"pre": correlationPre, "post": correlationPost}    
+            self.wcSyncTimeCorrelations = [ correlationPre, correlationPost ]   
     
     
     def packageDispersionData(self, worstCaseDispersion):
@@ -129,8 +133,8 @@ class Measurer:
         :returns dictionary {"pre": (preWcTick, worstCaseDispersion), "post": (postWcTick, worstCaseDispersion)}
         
         """
-        correlationPre = self.wcSyncTimeCorrelations["pre"]
-        correlationPost = self.wcSyncTimeCorrelations["post"]
+        correlationPre = self.wcSyncTimeCorrelations[0]
+        correlationPost = self.wcSyncTimeCorrelations[-1]
         preWcTick= correlationPre[0]
         postWcTick = correlationPost[0]
         self.wcDispersions = {"pre": (preWcTick, worstCaseDispersion), "post": (postWcTick, worstCaseDispersion)}

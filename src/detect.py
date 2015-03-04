@@ -296,6 +296,77 @@ def calcAcWcCorrelationAndDispersion( wcT1, acT2, acT3, wcT4, wcPrecision, acPre
 
 
 
+class TimelineReconstructor(object):
+
+    def __init__(self, timestampedControlTimestamps, parentTickRate, childTickRate, interpolate):
+        """\
+        Takes a history of control timestamp style data (correlations and
+        a speed multiplier value) that were recorded at particular times on
+        the parent timeline, and uses them to convert parent to child timeline
+        values while pretending to be at any point in that history.
+        
+        E.g. can be a history of control timestamps relating wall clock time
+        to sync. timeline time that was received via CSS-TS and be used to
+        convert wall clock times to sync timeline times using only the
+        information available at any particular point in the past.
+        
+        :param timestampedControlTimestamps: list of tuples: (parentTimeAt, (parentTime,timelineTime, speed))
+        :param parentTickRate: tick rate of parent timeline (ticks per second)
+        :param timelineTickRate: tick rate of timeline being reconstructed
+        :param interpolate: if True, then (assuming speeds don't change) will interpolate between consecutive control timestamps
+        """
+        self.controlTimestamps = sorted(timestampedControlTimestamps)
+        self.parentTickRate = float(parentTickRate)
+        self.childTickRate = float(childTickRate)
+        self.interpolate = interpolate
+        
+    def __call__(self, parentTime, atParentTime=None):
+        """\
+        :param v: Time on the parent timeline to be converted
+        :param at: Time on the parent timeline at which to make the conversion
+        :returns: Corresponding time on the reconstructed timeline
+        """
+        
+        if atParentTime == None:
+            atParentTime = parentTime
+        
+        # first find the control timestamp "most recent" and the one after
+        # (if there is one)
+        controlTimestamp = None
+        nextControlTimestamp = None
+        for when, cT in self.controlTimestamps:
+            if when <= atParentTime:
+                controlTimestamp = when, cT
+            else:
+                nextControlTimestamp = when, cT
+                break
+            
+        if controlTimestamp is None:
+            raise ValueError("Asked for a conversion at a time at which no control timestamps had yet arrived.")
+
+        tWhen, (tParent, tChild, tSpeed) = controlTimestamp
+        
+        if nextControlTimestamp is not None:
+            nWhen, (nParent, nChild, nSpeed) = nextControlTimestamp
+        else:
+            nWhen, (nParent, nChild, nSpeed) = None, (None,None,None)
+        
+        # if there is a next control timestamp and speed matches, then try to interpolate
+        if self.interpolate and nextControlTimestamp is not None and tSpeed == nSpeed:
+
+            # calc what time would be using the most recent (tXXX) and next (nXXX)
+            # control timestamps
+            t = (parentTime - tParent) * tSpeed / self.parentTickRate * self.childTickRate + tChild
+            n = (parentTime - nParent) * nSpeed / self.parentTickRate * self.childTickRate + nChild
+
+            # now interpolate
+            interpolator=ConvertAtoB((tWhen, t), (nWhen,n))
+            return interpolator(parentTime)
+            
+        else:
+            # else perform by extrapolation, ignoring the next control timestamp 
+            return (parentTime - tParent) * tSpeed / self.parentTickRate * self.childTickRate + tChild
+        
 
 # ---------------------------------------------------------------------------
 
@@ -496,7 +567,7 @@ class BeepFlashDetector(object):
     
     """
 
-    def __init__(self, wcAcReqResp, syncTimelineTickRate, wcSyncTimeCorrelations, wcDispersions, wcPrecisionNanos, acPrecisionNanos):
+    def __init__(self, wcAcReqResp, syncTimelineTickRate, wcSyncTimeCorrelations, wcDispersions, wcPrecisionNanos, acPrecisionNanos, interpolateWc2St=True):
         """
         :param wcAcReqResp: Dict containing "pre" and "post" sampling period clock sync request and response timings
         between the Wall Clock and Arduino clock (both in nanos).
@@ -509,11 +580,13 @@ class BeepFlashDetector(object):
         
         :param syncTimelineTickRate: The tick rate (in Hz) of the synchronisation timeline used for the CSS-TS exchanges
 
-        :param wcSyncTimeCorrelations: A dict { "pre":(preWc,preSt), "post":(postWc,postSt) }
-        where (preWc,preSt) is the correlation between wall clock time and synchronisation
-        timeline time at some point shortly before the sampling period, and
-        (postWc,postSt) is the correlation at some point shortly after the
-        sampling period.
+        :param wcSyncTimeCorrelations: A list of tuples of the form (wcTimeAt,(wcTime, stTime, speed)) 
+        where wcTime,stTime is the correlation between wall clock time and synchronisation
+        timeline time and speed is the timelinespeed multiplier at that point and
+        wcTimeAt is the wall clock time at which this correlation applied (e.g.
+        the time at which it was received from a CSS-TS server).
+        The list must contain at least one item, and that must have wcTimeAt
+        corresponding to some point shortly before measurement sampling began.
         
         :param wcDispersions: Either a function that returns the dispersion (in nanoseconds)
         of wall clock sync, or a dictionary {"pre":(preWcTime,preDisp), "post":(postWcTime,postDisp)}
@@ -525,6 +598,8 @@ class BeepFlashDetector(object):
         :param wcPrecisionNanos: The precision with which the wall clock was measured (in nanoseconds) when synchronising it with the Arduino clock.
 
         :param acPrecisionNanos: The precision with which the Arduino clock was measured by the Arduino (in nanoseconds) when synchronising it with the Wall Clock
+        
+        :param interpolateWc2St: (Default True). If True, then conversions between wallclock and sync timeline times will, where possible, be done via interpolation. 
         """
         
         super(BeepFlashDetector, self).__init__()
@@ -559,7 +634,8 @@ class BeepFlashDetector(object):
             wc2wcDisp = ErrorBoundInterpolator( wcDispersions["pre"], wcDispersions["post"] )
         
         # create object to convert wall clock time to sync timeline time
-        wc2st = ConvertAtoB(wcSyncTimeCorrelations["pre"], wcSyncTimeCorrelations["post"])
+        #wc2st = ConvertAtoB(wcSyncTimeCorrelations["pre"], wcSyncTimeCorrelations["post"])
+        wc2st = TimelineReconstructor(wcSyncTimeCorrelations, 1000000000, syncTimelineTickRate, interpolateWc2St)
         
         # create object that can convert from arduino time to sync timeline time
         self.ac2st = ArduinoToSyncTimelineTime(ac2wc, ac2acErr, wc2st, wc2wcDisp, syncTimelineTickRate)
