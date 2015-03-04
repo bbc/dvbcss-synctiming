@@ -265,7 +265,7 @@ The "flashes" and "beeps" detected by the measurement system are 3 frames in
 duration. If the TV or CSA playing the test video sequence skips more than 1
 or 2 consecutive frames then the "flashes" or "beeps" will not be detected.
 
-### The display's light output dues not toggle on/of repeatedly during a frame
+### The display's light output does not toggle on/off repeatedly during a frame
 ### ...or has off-periods significantly shorter than 4 ms
 
 Some display technologies modulate their light output (e.g. modulating the
@@ -277,7 +277,7 @@ If, during a frame containing a flash, the light output is modulated off for
 the flash and the start of a new one.
 
 ### The light sensor does not pick up significant stray light
-### The audio signals is free from background noise
+### The audio signal is free from background noise
 
 The light sensor should be fixed as closely as possible to the display and,
 ideally, enclosed to avoid too much stray light.
@@ -285,7 +285,8 @@ ideally, enclosed to avoid too much stray light.
 Similarly, the audio should be relatively free from interference. A direct
 connection from an audio output is ideal. However, if a microphone is used,
 then care is needed to ensure there is silence while measurements are being
-taken.
+taken. Note that the audio inputs are line-level, and so an un-powered
+mic's output signal is unlikely to work unless it is amplified.
 
 
 ## How does the measurement system work?
