@@ -320,22 +320,22 @@ class TimelineReconstructor(object):
         self.childTickRate = float(childTickRate)
         self.interpolate = interpolate
         
-    def __call__(self, parentTime, atParentTime=None):
+    def __call__(self, parentTime, at=None):
         """\
         :param v: Time on the parent timeline to be converted
         :param at: Time on the parent timeline at which to make the conversion
         :returns: Corresponding time on the reconstructed timeline
         """
         
-        if atParentTime == None:
-            atParentTime = parentTime
+        if at == None:
+            at = parentTime
         
         # first find the control timestamp "most recent" and the one after
         # (if there is one)
         controlTimestamp = None
         nextControlTimestamp = None
         for when, cT in self.controlTimestamps:
-            if when <= atParentTime:
+            if when <= at:
                 controlTimestamp = when, cT
             else:
                 nextControlTimestamp = when, cT
