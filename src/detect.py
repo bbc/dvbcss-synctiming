@@ -360,8 +360,8 @@ class TimelineReconstructor(object):
             n = (parentTime - nParent) * nSpeed / self.parentTickRate * self.childTickRate + nChild
 
             # now interpolate
-            interpolator=ConvertAtoB((tWhen, t), (nWhen,n))
-            return interpolator(parentTime)
+            interpolator=ConvertAtoB((tWhen,t), (nWhen,n))
+            return interpolator(at)
             
         else:
             # else perform by extrapolation, ignoring the next control timestamp 

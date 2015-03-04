@@ -27,6 +27,7 @@ sys.path.append("../src")
 from detect import ConvertAtoB
 from detect import ErrorBoundInterpolator
 from detect import calcAcWcCorrelationAndDispersion
+from detect import TimelineReconstructor
 from detect import calcFlashThresholds
 from detect import calcBeepThresholds
 from detect import detectPulses
@@ -78,6 +79,34 @@ class Test_calcAcWcCorrelationAndDispersion(unittest.TestCase):
         self.assertEquals(c, (1001, 120))
         self.assertEquals(d, 38/2 + 5 + 2)
 
+
+
+class Test_TimelineReconstructor(unittest.TestCase):
+    def testSimple(self):
+        history = [
+            (100, (100, 1000, 1.0)),    # when time was 100, we observed that time 100 maps to timeline position 1000, and that the speed of timeline for 1
+            (200, (100, 1000, 1.0)),    # when time was 200, we observed that the same relationship was true
+            (300, (100, 1005, 1.0)),    # by time 300, we observed that the relationship had changed slightly
+        ]
+        parentTickRate = 100
+        childTickRate = 1000
+        interpolate = True
+        
+        reconstructor = TimelineReconstructor(history, parentTickRate, childTickRate, interpolate)
+
+        # do tests, pretending we wind the clock back to when time was 120
+        self.assertEquals(reconstructor(150, at=120), 1500)
+        self.assertEquals(reconstructor(200, at=120), 2000)
+        
+        # now pretend we're after the 3rd observations - the relationship should have shifted
+        self.assertEquals(reconstructor(110, at=300), 1105)
+        
+        # now pretend we're midway between 2nd and 3rd. Expect it to interpolate
+        self.assertEquals(reconstructor(110, at=250), 1102.5)
+        
+        # cant reconstruct at a time before the first control timestamp was logged
+        self.assertRaises(ValueError, reconstructor, 110, at=99)
+        
 
 
 class Test_calcThresholds(unittest.TestCase):
