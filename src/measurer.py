@@ -34,12 +34,13 @@ class DubiousInput(Exception):
 
 class Measurer:
 
-    def __init__(self, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate):
+    def __init__(self, role, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate):
         """\
 
         connect with the arduino and send commands on which pins are to be read during
         data capture.
 
+        :param role "master" or "client" which role the measurement system is acting in
         :param pinsToMeasure a list of pin names that are to be measured.
                 a name must be one of "LIGHT_0", "LIGHT_1", "AUDIO_0" or "AUDIO_1"
         :param expectedTimings  dict mapping pin names ("LIGHT_0","LIGHT_1","AUDIO_0","AUDIO_1") to lists containing expected flash/beep times
@@ -51,6 +52,7 @@ class Measurer:
         :param syncTimelineTickRate: tick rate of the sync timeline
         """
 
+        self.role = role
         self.pinsToMeasure = pinsToMeasure
         self.expectedTimings = expectedTimings
         self.videoStartTicks = videoStartTicks
@@ -67,12 +69,48 @@ class Measurer:
         if self.nActivePins != len(self.pinsToMeasure) :
             raise ValueError("# activated pins mismatches request: ")
 
-    def ctsRecorder(syncController, speedChange):
-        self.timestamps.append((speedChange, syncController.latestCt))
+
+
+    def ctsRecorder(self, speedChange):
+        """\
+
+        Only used when the measurement system is acting as client.
+        Append to list of reported correlations as a tuple
+        (local wallclock time, (received wallclock, received sync time line clock value, speed multiplier of sync time line clock)
+
+        """
+
+        whenReceived = self.wallClock.ticks
+        cts = self.syncTimelineClockController.latestCt
+        rcvdTimestamp = cts.timestamp
+        rcvdWallClock= rcvdTimestamp.wallClockTime
+        rcvdSyncTimeLineClockValue = rcvdTimestamp.contentTime
+        speedMultiplier = cts.timelineSpeedMultiplier
+        self.timestampedReceivedControlTimeStamps.append( (whenReceived, (rcvdWallClock, rcvdSyncTimeLineClockValue, speedMultiplier)) )
+
+
+
+
 
     def setSyncTimeLinelockController(self, syncTimelineClockController):
-        self.timestamps = []
-        syncTimelineClockController.onTimingChange = ctsRecorder
+        """\
+
+        Only used when the measurement system is acting as client.
+        Remember the clock controller used to drive changes to our
+        emulation of the sync timeline based on correlations received over
+        the TS protocol.  Initialise the list that will capture these
+        reported correlations also.  Set the bound function to be called back
+        by the clock controller as any time changes are detected by the controller examining
+        the TS protocol messages.  These are notified using the bound function "ctsRecorder" above
+
+        """
+
+        self.timestampedReceivedControlTimeStamps = []
+        self.syncTimelineClockController = syncTimelineClockController
+        syncTimelineClockController.onTimingChange = self.ctsRecorder
+
+
+
 
     def activatePinReading(self):
         """\
@@ -96,6 +134,8 @@ class Measurer:
     def snapShot(self):
         """\
 
+        only used when measurement system is acting as master
+
         take correlation between wall clock and sync time line
 
         :attribute syncTimelineClock the sync time line clock
@@ -117,16 +157,23 @@ class Measurer:
     def capture(self):
         """\
 
-        initiate the data capture
+        initiate the data capture.  For the sync time line correlations, use the observed
+        correlations provided by the TS server when the measurement system is acting as a client,
+        or use snapshots of the timeline being published by the measurement when it is acting
+        as a server
 
         """
         if self.nActivePins > 0:
-            correlationPre = self.snapShot()
+            if self.role == "master":
+                correlationPre = self.snapShot()
             (self.channels, self.dueStartTimeUsecs, self.dueFinishTimeUsecs, timeDataPre, timeDataPost) = \
                                         captureAndPackageIntoChannels(self.f, self.pinsToMeasure, self.pinMap, self.wallClock)
             self.wcAcReqResp = {"pre":timeDataPre, "post":timeDataPost}
-            correlationPost = self.snapShot()
-            self.wcSyncTimeCorrelations = [ correlationPre, correlationPost ]
+            if self.role == "master":
+                 correlationPost = self.snapShot()
+                 self.wcSyncTimeCorrelations = [correlationPre, correlationPost]
+            elif self.role == "client":
+                self.wcSyncTimeCorrelations = self.timestampedReceivedControlTimeStamps
 
 
     def packageDispersionData(self, worstCaseDispersion):

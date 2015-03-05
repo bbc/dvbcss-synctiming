@@ -181,7 +181,8 @@ if __name__ == "__main__":
     # down in event of ctrl-c to exit the app
     try:
 
-        measurer = Measurer(cmdParser.pinsToMeasure, \
+        measurer = Measurer("client", \
+                            cmdParser.pinsToMeasure, \
                             cmdParser.pinExpectedTimes, \
                             cmdParser.args.videoStartTicks, \
                             wallClock, \
