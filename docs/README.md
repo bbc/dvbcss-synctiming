@@ -49,6 +49,44 @@ See also:
 
    * It analyses the measurements and reports the results.
 
+
+### When measuring a TV Device
+
+[exampleTVTester.py](../src/exampleTVTester.py) does the following:
+
+1. The system begins to pretend to be the CSA.
+
+   * It acts as a client, synchronising its local wall clock to that of the TV
+     via CSS-WC and synchronising to a timeline via CSS-TS.
+
+   * It then waits and confirms that timeline synchronisation is working
+     and that the wall clock is synchronising with not too high a dispersion.
+
+2. Measurement begins. The measurement system records the following:
+
+   * hanges in dispersion of the wall clock (this changes after every
+     adjustment made by the CSS-WC client in the measurement system).
+
+   * Control Timestamps received from the TV via CSS-TS.
+
+   * Data from the light sensors and/or audio inputs (using the microcontroller)
+     which is then transfered to the PC when measurement completes.
+
+4. Once measurement is complete, the system can analyse the results.
+
+   * The recorded wall clock dispersions and Control Timestamps are
+     used to reconstruct, for any time during the measurement process:
+     
+       * what the dispersion (uncertainty) the wall clock of the
+         measurement system had,
+       * what wall clock time corresponded to what synchronisation timeline time.
+
+   * Along with the measurmeents, these reconstructions are fed into
+     the analysis process.
+
+   * The results are reported.
+
+
 ## How are measurements recorded and analysed?
 
 The processes happening in order to take a measurement of sync timing are 
@@ -161,11 +199,12 @@ software is running on.
   the timestamps being sent out by the TV accurately represent what the TV is
   outputting (via its display and speakers).
 
-When synchronising time with the Arduino it can therefore do so in terms of
+When synchronising time with the Arduino it does so in terms of
 its model of the Wall Clock - converting the timing of sampling to be in
-terms of the Wall Clock. Using the information from the CSS-TS protocol
-messages it can then do another conversion to get from Wall Clock times to
-times on the timeline being conveyed using the CSS-TS protocol.
+terms of the Wall Clock. Using its understanding of the relationship between
+Wall Clock and Synchornisation Timeline it can then do another conversion to
+get from Wall Clock times to times on the timeline being conveyed using the
+CSS-TS protocol.
 
    ![Illustration of how times are translated from Arduino Clock to Synchronisation Timeline](translating-timings.png)
 
@@ -176,7 +215,7 @@ times on the timeline being conveyed using the CSS-TS protocol.
 * The timeline for the media is shared between the TV Device and CSA using the
   CSS-TS protocol.
 
-Given knowledge of how times map from before and after sampling, the code can
+Given knowledge of how times map during sampling, the code can
 interpolate any time in-between. The error bounds (e.g. dispersion) known at
 both before and after times can also be interpolated.
 
@@ -187,6 +226,9 @@ playing media - by providing a timeline via CSS-TS that the CSA can also
 synchronise to.  The choice of timeline that the measurement system provides
 is set using command line options.
 
+* The measurement system notes the relationship between Wall Clock and
+  Synchronisation Timeline (beacause it controls it).
+
 When the measurement system is running in the role of a CSA, it acts as a
 client, synchronising to the wall clock provided by the TV Device via the
 CSS-WC protocol, and synchronising to a timeline provided by the TV Device
@@ -194,6 +236,9 @@ via the CSS-TS protocol. It uses the CSS-CII protocol to obtain the URLs at
 which the TV Device is serving the CSS-WC and CSS-TS protocols. The choice of
 timeline that the measurement tries to use is set using command line options.
 
+* It logs all the Control Timestamps it receives via CSS-TS so that it can
+  reconstruct its understanding of how to convert between wall clock and
+  synchronisation timeline time at any point during the measurment period.
 
 ### Quantifying measurement error
 
@@ -209,6 +254,10 @@ This is the sum of:
 It is expected that this will be dominated by the dispersion of the wall clock
 estimate.
 
+When the measurement system is pretending to be a CSA it records dispersion
+of the Wall Clock (the potential error) during the measurement period. It does
+so by listening for changes reported by the algorithm for clock synchronisation
+used within its Wall Clock protocol Client.
 
 ### How are the detected flashes/beeps matched up with the video sequence?
 

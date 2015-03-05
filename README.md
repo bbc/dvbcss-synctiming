@@ -6,13 +6,18 @@ Specification](https://www.dvb.org/search/results/keywords/A167). This
 specification defines protocols that enable synchronisation of media
 presentation between a TV and Companion devices (mobiles, tablets, etc).**
 
+* **[Overview](#overview)**
+* **[Getting Started](#getting-started)**
+* **[How does it work?](#how-does-the-measurement-system-work)**
+
 This system can measure with approximately millisecond accuracy for
-Companion Screen Applications (CSAs).
+Companion Screen Applications (CSAs) and TV Devices.
+
+*Update: Measurement of TV Devices has been added!*
 
 *Very shortly we will be adding an example showing how to use the same
-measurement back-end code to measure a TV Device or to check relative
-synchronisation between audio and video. The explanations here cover
-all these situations.*
+measurement back-end code to measure relative synchronisation between
+audio and video. The explanations here cover all these situations.*
 
 ## Overview
 
@@ -246,7 +251,60 @@ Screen Application. It will connect to the TV using the DVB CSS protocols and
 compare the timing information reported by the TV to the light and sound it
 sees coming from the TV.*
 
-Code implementing this mode of operation will be added soon.
+1. Press the "RESET" button on the Arduino.
+
+2. Start the TV Device playing the test video sequence.
+
+3. Start the measurement software by running
+   [src/exampleTVTester.py](src/exampleTVTester.py) and configuring it using
+   command line parameters. For example (split over multiple lines for ease of
+   reading):
+
+        $ python src/exampleTvTester.py ws://192.168.1.23:7681/ts          \
+                                        udp://192.168.1.23:6677            \
+                                        ""                                 \
+                                        "urn:dvb:css:timeline:pts"         \
+                                        90000                              \
+                                        --light0 metadata.json             \
+                                        --audio0 metadata.json             \
+                                        --toleranceTest 23.0
+   
+    This instructs the measurement system to:
+
+     * Pretend to be a CSA, connecting to:
+       * a CSS-TS service at: ws://192.168.1.23:7681/ts
+       * a CSS-WC service at 192.168.1.23 on port 6677
+      
+     * ... and to request (via CSS-TS) to synchronise to a PTS timeline:
+       * denoted by timeline selector value of "urn:dvb:css:timeline:pts"
+       * with a tick rate of 90000 ticks per second
+       * asking that the timeline be available from the TV irrespective
+         of what content is showing
+         (a contentIdStem of the empty string "" will match any content ID)
+
+     * Assume the TV will play the test sequence video such that the first
+       frame of that video will be showing when the timeline position is
+       12345678.
+
+     * Measure the first light sensor (light sensor 0) and first audio input
+       (audio input 0), and to compare both to the expected times of beeps
+       and flashes in `metadata.json` (this file was created by the 
+       [test video sequence generator](test_sequence_gen/README.md))
+       
+     * Report on whether the timing was accurate enough to be within a
+       tolerance of +/- 23 milliseconds (after error bounds of measurement
+       are taken into account)
+   
+    (For more information on the command line arguments, use the `--help`
+    option) 
+
+The measurement system will start, connect to the TV and immediately
+begin measuring.
+
+The system will then display the results and exit. This includes details of
+how good a match it found between the pattern of flashes and beeps it
+expected and those that it observed. It also reports how far ahead or behind
+the CSA appeared to be.
 
 
 ## Assumptions
