@@ -58,10 +58,10 @@ class DispersionRecorder(object):
         
         # plug into the algorithm object to receive the onClockAdjusted calls
         self.original_onClockAdjusted = self.algorithm.onClockAdjusted
-        self.algorithm.onClockAdjusted = self.onClockAdjusted
+        self.algorithm.onClockAdjusted = self._onClockAdjustedHandler
         
         
-    def onClockAdjusted(self, timeAfterAdjustment, adjustment, oldDispersionNanos, newDispersionNanos, dispersionGrowthRate):
+    def _onClockAdjustedHandler(self, timeAfterAdjustment, adjustment, oldDispersionNanos, newDispersionNanos, dispersionGrowthRate):
         if self.recording:
             entry = timeAfterAdjustment, adjustment, oldDispersionNanos, newDispersionNanos, dispersionGrowthRate
             self.changeHistory.append(entry)
