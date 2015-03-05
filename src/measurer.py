@@ -191,7 +191,7 @@ class Measurer:
         correlationPost = self.wcSyncTimeCorrelations[-1]
         preWcTick= correlationPre[0]
         postWcTick = correlationPost[0]
-        self.wcDispersions = {"pre": (preWcTick, worstCaseDispersion), "post": (postWcTick, worstCaseDispersion)}
+        self.wcDispersions = lambda wcTime : worstCaseDispersion
 
 
     def detectBeepsAndFlashes(self, wcPrecisionNanos, acPrecisionNanos):
