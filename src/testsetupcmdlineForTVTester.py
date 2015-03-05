@@ -62,7 +62,7 @@ class TVTesterCmdLineParser:
         parser.add_argument("contentIdStem", type=str, help="The contentId the measurement system will ask the TV to match (e.g. \"urn:github.com/bbc/dvbcss-synctiming:sync-timing-test-sequence\")")
         parser.add_argument("timelineSelector", type=str, help="The timelineSelector for the timeline to be provided (e.g. \"urn:dvb:css:timeline:pts\" for PTS).")
         parser.add_argument("videoStartTicks", type=int, help="The timeline tick value corresponding to when the CSA is expected to be showing the first frame of the test video sequence.")
-        parser.add_argument("timelineClockFrequency", action="store", type=int, nargs=1, help="Ticks per second of the media timeline")
+        parser.add_argument("timelineClockFrequency", action="store", type=int, help="Ticks per second of the media timeline")
 
         parser.add_argument("--light0",   dest="light0_metadatafile", type=str, nargs=1, help="Measure light sensor input 0 and compare to expected flash timings in the named JSON metadata file.")
         parser.add_argument("--light1",   dest="light1_metadatafile", type=str, nargs=1, help="Measure light sensor input 1 and compare to expected flash timings in the named JSON metadata file.")
@@ -72,14 +72,14 @@ class TVTesterCmdLineParser:
         parser.add_argument("wcBindAddr",action="store", type=dvbcss.util.iphost_str, nargs="?",help="IP address or host name to bind WC client to (default="+str(DEFAULT_WC_BIND[0])+")",default=DEFAULT_WC_BIND[0])
         parser.add_argument("wcBindPort",action="store", type=dvbcss.util.port_int_or_random,   nargs="?",help="Port number to bind WC client to (default="+str(DEFAULT_WC_BIND[1])+")",default=DEFAULT_WC_BIND[1])
         parser.add_argument("--mfe", \
-                            "--maxfreqerror", dest="maxFreqError",  type=int, action="store",default=PPM,help="Set the maximum frequency error for the local wall clock in ppm (default="+str(PPM)+")")
+                             "--maxfreqerror", dest="maxFreqError",  type=int, action="store", help="Set the maximum frequency error for the local wall clock in ppm (default="+str(PPM)+")", default=PPM)
 
         parser.add_argument("--toleranceTest",dest="toleranceSecs",type=ToleranceOrNone, action="store", nargs=1,help="Do a pass/fail test on whether the Master TV is accurately synchronised within this specified tolerance, in milliseconds. Test is not performed if this is not specified.",default=[TOLERANCE])
 
         self.args = parser.parse_args()
 
-        wc_dest=args.wcUrl[0]
-        self.wcBind=(args.wcBindAddr, args.wcBindPort)
+        wc_dest = self.args.wcUrl[0]
+        self.wcBind=(self.args.wcBindAddr, self.args.wcBindPort)
 
         # parse pin data
         self.pinArgMap = {
@@ -93,6 +93,7 @@ class TVTesterCmdLineParser:
         self.pinsToMeasure = self.pinExpectedTimes.keys()
 
         if len(self.pinsToMeasure) == 0:
+            print "AARGGGGH"
             sys.stderr.write("\nAborting. No light sensor or audio inputs have been specified.\n\n")
             sys.exit(1)
 
@@ -142,8 +143,8 @@ class TVTesterCmdLineParser:
             print "   Measuring input %s using expected timings from : %s" % (pin, self.pinArgMap[pin][0])
         print
         #print "   CII server at                 : %s" % self.ciiUrl
-        print "   TS server at                          : %s" % self.tsUrl
-        print "   WC server at                          : %s" % self.wcUrl
+        print "   TS server at                          : %s" % self.args.tsUrl
+        print "   WC server at                          : %s" % self.args.wcUrl
         print "   Content id stem asked of the TV       : %s" % self.args.contentIdStem
         print "   Timeline selector asked of TV         : %s" % self.args.timelineSelector
         print

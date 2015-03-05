@@ -71,7 +71,7 @@ class Measurer:
 
 
 
-    def ctsRecorder(self, speedChange):
+    def ctsRecorder(self, speedChanged):
         """\
 
         Only used when the measurement system is acting as client.

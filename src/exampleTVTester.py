@@ -112,7 +112,11 @@ import time
 
 from ws4py.server.cherrypyserver import WebSocketPlugin
 from dvbcss.protocol.cii import TimelineOption
-from dvbcss.clock import SysClock, CorrelatedClock, measurePrecision
+from dvbcss.clock import SysClock, CorrelatedClock, measurePrecision, TunableClock
+from dvbcss.protocol.client.wc.algorithm import LowestDispersionCandidate
+from dvbcss.protocol.client.wc import WallClockClient
+from dvbcss.protocol.client.ts import TSClientClockController
+
 
 from measurer import Measurer
 from measurer import DubiousInput
@@ -121,13 +125,14 @@ import stats
 
 
 
-def createCSSClientObjects(args):
+def createCSSClientObjects(cmdParser):
+    args = cmdParser.args
     sysclock=SysClock()
     wallClock=TunableClock(sysclock,tickRate=1000000000) # nanos
     # measure precision of wall clock empirically
     wcPrecisionNanos = measurePrecision(wallClock) * 1000000000
     algorithm = LowestDispersionCandidate(wallClock,repeatSecs=0.3,timeoutSecs=0.3)
-    wcClient=WallClockClient(args.wcBind, args.wcUrl[0], wallClock, algorithm)
+    wcClient=WallClockClient(cmdParser.wcBind, args.wcUrl[0], wallClock, algorithm)
     timelineClock = CorrelatedClock(wallClock, args.timelineClockFrequency)
 
     print "Connecting, requesting timeline for:"
@@ -135,8 +140,8 @@ def createCSSClientObjects(args):
     print "   and using timeline selector: ", args.timelineSelector
     print
 
-    ts = TSClientClockController(tsUrl, args.contentIdStem, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
-    return (ts, timelineClock, wcClient, wallClock, wcPrecisionNanos)
+    ts = TSClientClockController(args.tsUrl[0], args.contentIdStem, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
+    return (ts, timelineClock, args.timelineClockFrequency, wcClient, wallClock, wcPrecisionNanos)
 
 
 def getWorstCaseDispersion():
@@ -169,9 +174,10 @@ if __name__ == "__main__":
 
     syncTimelineClockController, \
     syncTimelineClock, \
+    syncClockTickRate, \
     wallClockClient, \
     wallClock, \
-    wcPrecisionNanos = createCSSClients(cmdParser.args)
+    wcPrecisionNanos = createCSSClientObjects(cmdParser)
 
     # Arduino Due micros() function precision known to be 1us
     # http://forum.arduino.cc/index.php?PHPSESSID=dulptiubbkqqer7p5hv2fqc583&topic=147505.msg1108517#msg1108517
