@@ -588,13 +588,9 @@ class BeepFlashDetector(object):
         The list must contain at least one item, and that must have wcTimeAt
         corresponding to some point shortly before measurement sampling began.
         
-        :param wcDispersions: Either a function that returns the dispersion (in nanoseconds)
-        of wall clock sync, or a dictionary {"pre":(preWcTime,preDisp), "post":(postWcTime,postDisp)}
-        indicating the dispersion of wall clock (preDisp) at a time (preWcTime)
-        before the sampling period and the dispersion (postDisp) at a time
-        (postWcTime) shortly after, with the expectation that the dispersion
-        can be interpolated to calculate the dispersion at any point in between.
-        
+        :param wcDispersions: A function that returns the dispersion (in nanoseconds)
+        of the Wall clock at a given wall clock time during the measurement period.
+                
         :param wcPrecisionNanos: The precision with which the wall clock was measured (in nanoseconds) when synchronising it with the Arduino clock.
 
         :param acPrecisionNanos: The precision with which the Arduino clock was measured by the Arduino (in nanoseconds) when synchronising it with the Wall Clock
@@ -626,12 +622,7 @@ class BeepFlashDetector(object):
 
         ac2acErr = ErrorBoundInterpolator( (acPreTime, acWcDisp["pre"]), (acPostTime, acWcDisp["post"]) )
         
-        # create an object for calculating wall clock dispersion at any point
-        # given that we are interpolating wall clock
-        if hasattr(wcDispersions, "__call__"):
-            wc2wcDisp = wcDispersions
-        else:
-            wc2wcDisp = ErrorBoundInterpolator( wcDispersions["pre"], wcDispersions["post"] )
+        wc2wcDisp = wcDispersions
         
         # create object to convert wall clock time to sync timeline time
         #wc2st = ConvertAtoB(wcSyncTimeCorrelations["pre"], wcSyncTimeCorrelations["post"])
