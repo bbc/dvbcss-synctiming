@@ -371,7 +371,9 @@ if __name__ == "__main__":
                             cmdParser.args.videoStartTicks, \
                             servers["wallclock"], \
                             syncTimelineClock, \
-                            syncClockTickRate)
+                            syncClockTickRate, \
+                            wcPrecisionNanos, \
+                            acPrecisionNanos)
 
         print
         raw_input("Press RETURN once CSA is connected and synchronising to this 'TV Device' server")
@@ -394,9 +396,11 @@ if __name__ == "__main__":
         servers["tsServer"][0].updateAllClients()
 
         worstCaseDispersion = getWorstCaseDispersionFromDeviceUnderTest()
-        measurer.packageDispersionData(worstCaseDispersion)
-
-        measurer.detectBeepsAndFlashes(wcPrecisionNanos, acPrecisionNanos)
+        
+        def dispersionFunc(wcTime):
+            return worstCaseDispersion
+        
+        measurer.detectBeepsAndFlashes(dispersionFunc = dispersionFunc)
 
         for channel in measurer.getComparisonChannels():
             try:

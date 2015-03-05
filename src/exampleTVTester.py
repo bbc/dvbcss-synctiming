@@ -120,6 +120,7 @@ from dvbcss.protocol.client.ts import TSClientClockController
 
 from measurer import Measurer
 from measurer import DubiousInput
+from dispersion import DispersionRecorder
 import stats
 
 
@@ -135,13 +136,17 @@ def createCSSClientObjects(cmdParser):
     wcClient=WallClockClient(cmdParser.wcBind, args.wcUrl[0], wallClock, algorithm)
     timelineClock = CorrelatedClock(wallClock, args.timelineClockFrequency)
 
+    # start recording dispersion of the wall clock
+    dispRecorder=DispersionRecorder(algorithm)
+    dispRecorder.start()
+
     print "Connecting, requesting timeline for:"
     print "   Any contentId beginning with:", args.contentIdStem
     print "   and using timeline selector: ", args.timelineSelector
     print
 
     ts = TSClientClockController(args.tsUrl[0], args.contentIdStem, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
-    return (ts, timelineClock, args.timelineClockFrequency, wcClient, wallClock, wcPrecisionNanos)
+    return (ts, timelineClock, args.timelineClockFrequency, wcClient, wallClock, wcPrecisionNanos, dispRecorder)
 
 
 def getWorstCaseDispersion():
@@ -165,6 +170,8 @@ def startCSSClients(wallClockClient, tsClientClockController):
 
 
 
+
+
 if __name__ == "__main__":
 
     from testsetupcmdlineForTVTester import TVTesterCmdLineParser
@@ -178,7 +185,8 @@ if __name__ == "__main__":
     syncClockTickRate, \
     wallClockClient, \
     wallClock, \
-    wcPrecisionNanos = createCSSClientObjects(cmdParser)
+    wcPrecisionNanos, \
+    dispRecorder = createCSSClientObjects(cmdParser)
 
     # Arduino Due micros() function precision known to be 1us
     # http://forum.arduino.cc/index.php?PHPSESSID=dulptiubbkqqer7p5hv2fqc583&topic=147505.msg1108517#msg1108517
@@ -197,7 +205,9 @@ if __name__ == "__main__":
                             cmdParser.args.videoStartTicks, \
                             wallClock, \
                             syncTimelineClock, \
-                            syncClockTickRate)
+                            syncClockTickRate, \
+                            wcPrecisionNanos, \
+                            acPrecisionNanos)
 
         measurer.setSyncTimeLinelockController(syncTimelineClockController)
 
@@ -209,7 +219,7 @@ if __name__ == "__main__":
         while not syncTimelineClockController.connected and time.time() < timeout:
             time.sleep(0.1)
         if not syncTimelineClockController.connected:
-            sys.write("\nTimed out trying to connect to CSS-TS. Aborting.\n\n")
+            sys.stderr.write("\nTimed out trying to connect to CSS-TS. Aborting.\n\n")
             sys.exit(1)
         
         print "Connected."
@@ -220,14 +230,16 @@ if __name__ == "__main__":
         while not syncTimelineClockController.timelineAvailable and time.time() < timeout:
             time.sleep(0.1)
         if not syncTimelineClockController.timelineAvailable:
-            sys.write("\n\nWaited a while, but timeline was not available. Aborting.\n\n")
+            sys.stderr.write("\n\nWaited a while, but timeline was not available. Aborting.\n\n")
             sys.exit(1)
         
         print "Synced to timeline."
         
         # finally check if dispersion is sane before proceeding
-        if wallClockClient.algorithm.getCurrentDispersion() > 1000000000*1.0:
-            sys.write("\n\nWall clock client synced with dispersion greater than +/- 1 second. Aborting.\n\n")
+        currentDispersion = wallClockClient.algorithm.getCurrentDispersion()
+        if currentDispersion > 1000000000*1.0:
+            sys.stderr.write("\n\nWall clock client synced with dispersion +/- %f.3 milliseconds." % (currentDispersion / 1000000.0))
+            sys.stderr.write("\nWhich is greater than +/- 1 second. Aborting.\n\n")
             sys.exit(1)
         
 
@@ -240,10 +252,7 @@ if __name__ == "__main__":
             sys.write("\n\nLost connection to CSS-TS or timeline became unavailable. Aborting.\n\n")
             sys.exit(1)
 
-        worstCaseDispersion = getWorstCaseDispersion()
-        measurer.packageDispersionData(worstCaseDispersion)
-
-        measurer.detectBeepsAndFlashes(wcPrecisionNanos, acPrecisionNanos)
+        measurer.detectBeepsAndFlashes(dispersionFunc = dispRecorder.dispersionAt)
 
         for channel in measurer.getComparisonChannels():
             try:

@@ -34,7 +34,7 @@ class DubiousInput(Exception):
 
 class Measurer:
 
-    def __init__(self, role, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate):
+    def __init__(self, role, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate, wcPrecisionNanos, acPrecisionNanos):
         """\
 
         connect with the arduino and send commands on which pins are to be read during
@@ -50,6 +50,8 @@ class Measurer:
                 to take various time snapshots
         :param syncTimelineClock the sync time line clock object
         :param syncTimelineTickRate: tick rate of the sync timeline
+        :param wcPrecisionNanos the wall clock precision in nanoseconds
+        :param acPrecisionNanos the arduino clock's precision in nanoseconds
         """
 
         self.role = role
@@ -59,6 +61,8 @@ class Measurer:
         self.wallClock = wallClock
         self.syncTimelineClock = syncTimelineClock
         self.syncClockTickRate = syncTimelineTickRate
+        self.wcPrecisionNanos = wcPrecisionNanos
+        self.acPrecisionNanos = acPrecisionNanos
 
         self.f = arduino.connect()
         self.pinMap = {"LIGHT_0": 0, "AUDIO_0": 1, "LIGHT_1": 2, "AUDIO_1": 3}
@@ -176,49 +180,24 @@ class Measurer:
                 self.wcSyncTimeCorrelations = self.timestampedReceivedControlTimeStamps
 
 
-    def packageDispersionData(self, worstCaseDispersion):
+    def detectBeepsAndFlashes(self, dispersionFunc):
         """\
 
-        package up the dispersion data as needed for the detect module.
-        This includes the worst case observed dispersion on the client entered by the operator
+        Uses the detect module to detect any flashes or beeps
+        and sets the results in self.testPackage (a list with one entry per
+        input being sampled)
 
-        :param correlationPre the correlation between the wall clock and the sync time line prior to sampling
-        :param correlationPost the correlation between the wall clock and the sync time line after sampling
-        :returns dictionary {"pre": (preWcTick, worstCaseDispersion), "post": (postWcTick, worstCaseDispersion)}
-
-        """
-        correlationPre = self.wcSyncTimeCorrelations[0]
-        correlationPost = self.wcSyncTimeCorrelations[-1]
-        preWcTick= correlationPre[0]
-        postWcTick = correlationPost[0]
-        self.wcDispersions = lambda wcTime : worstCaseDispersion
-
-
-    def detectBeepsAndFlashes(self, wcPrecisionNanos, acPrecisionNanos):
-        """\
-
-        use the detect module to detect any flashes or beeps.
-
-        :param syncClockTickRate the clock tick rate for the sync time line clock
-        :param wcPrecisionNanos the wall clock precision in nanoseconds
-        :param acPrecisionNanos the arduino clock's precision in nanoseconds
-
+        :param dispersionFunc: a function that, when called and passed a wall clock time, will return the wall clock dispersion
+            corresponding to that time. When testing a CSA, this should be the dispersion
+            measured by the CSA. When testing a TV, it should be the dispersion
+            reported by the local wall clock client algorithm in the measuring system.
         """
 
         detector = detect.BeepFlashDetector(self.wcAcReqResp, self.syncClockTickRate, \
-                                            self.wcSyncTimeCorrelations, self.wcDispersions, \
-                                            wcPrecisionNanos, acPrecisionNanos)
+                                            self.wcSyncTimeCorrelations, dispersionFunc, \
+                                            self.wcPrecisionNanos, self.acPrecisionNanos)
         self.observedTimings = analyse.runDetection(detector, self.channels, self.dueStartTimeUsecs, self.dueFinishTimeUsecs)
-        self.makeComparisonChannels()
 
-
-
-    def makeComparisonChannels(self):
-        """\
-
-        prepare the measurement results, ready for iteration by the user of this service
-
-        """
         self.testPackage = []
         for result in self.observedTimings:
             pinName = result["pinName"]
