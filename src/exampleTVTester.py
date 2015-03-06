@@ -15,18 +15,18 @@
 # limitations under the License.
 
 '''
-Example CSA measurement system / tester
+Example master TV measurement system / tester
 =======================================
 
 Purpose and Usage
 -----------------
 
 This is an example command line tool that runs a measurement system, acting in
-the role of the TV Device, to check the synchronisation timing of a CSA that
-connects to it. The measurements are taken by an Arduino Due microcontroller
+the role of the CSA, to check the synchronisation timing of a master TV that
+it connects to. The measurements are taken by an Arduino Due microcontroller
 connected via USB and with light sensor(s) and audio input(s) connected. These
 observe the pattern of flashes/beeps from a test video sequence played by the
-CSA.
+TV.
 
 The final output is a measurement (to the nearest millisecond) of when the
 flashes/beeps occurred compared to when they were expected to occur (given the
@@ -44,11 +44,60 @@ How it works
 This module runs the process of controlling the arduino (activating the appropriate pins for reading),
 the sampling of the flashes / beeps, and the detection of the centre point timings of these
 and the analysis of these centre points to look for the best match against the expected
-centre point timings
+centre point timings.
+
+We instantiate a CSS-WC client and a CSS_TS client here.
+
+The wall clock client will communicate with a wall clock server (specified by the cmd) line using
+the CSS-WC protocol so that the local wall clock value approximates closely to the remote value of the server's wall clock
+at any instant of time here in the measuring system.
+
+The TV master is rendering video content.  In the general case (not handled in this system), that content
+could be available on the TV via different timelines (e.g from the broadcast transport stream, in which
+case the timeline is expressed using presentation time stamps; or it could come e.g. from a catch-up
+service, in which the timeline is expressed using whatever has been used to encode the catch-up
+video delivered over IP).
+
+Using the CSS-TS protocol, the client (here) requests the content by its id (actually by a content
+stem) and which timeline to try and find for it (command line arguments)
+
+Assuming the TV is rendering this content using this
+timeline, then the CSS-TS master on the TV creates a control timestamp, which measures both the
+value of the timeline clock and the value of the wallclock at that instant in time, which is
+sent to the client.  Assuming the TV is correctly rendering the content, there is a linear relationship
+between its timeline clock and its wallclock ... the control timestamp provides a point on this line.
+Used in conjunction with the timeline speed multiplier (1.0 for normal playback), which provides the slope of this line,
+we can therefore calculate what the value of the timeline clock should be using our local wallclock (which tracks the
+remote wallclock, and adjusts as needed based on CSS-WC information).
+
+This is handled by a local clock object, a CorrelatedClock whose tick rate is set to match that
+of the requested timeline (command line parameter).  This clock is correlated with the local wallclock.
+
+Any adjustment needed to the local wallclock (based on observing the CSS-WC protocol) will cause the
+correlated clock to adjust, and in turn this causes a response in a TSClientClockController object,
+resulting in a new control timestamp being reported to the measuring system (actually within measurer.py)
+
+Any such changes are remembered, along with changes of dispersion in the wallclock, picked up
+by the local wallclock's algorithm, and these are available to reconstitute the changes in timeline/
+wallclock relationship occurring during the data capture.
+
+We know, from the command line, the starting value of the timeline.  We also know the relationship
+between the arduino due's clock and our local wall clock ... this means we can capture the flashes/beeps
+and compute the correspond timeline clock value, based on the remembered control timestamp information
+and the remembered dispersion data.
+
+These can be compared against the expected times provided by the json file.
+
 
 The overall process is:
 
     Parse the command line.
+
+    Create a wall clock client, and a CSS-TS client, the CorrelatedClock
+    with the same tick rate as the timeline, and the TSClientClockController.
+    Create a dispersion recorder hooked up to the wallclock algorithm.
+
+
 
     Create the servers for the CSS-CII, WC and TS protocols using parsed command line.
 
@@ -56,12 +105,17 @@ The overall process is:
 
         The sync timeline has an associated clock whose tick rate is a command line argument
 
-    Start the servers
-
     Create a Measurer object
 
         The constructor connects to the Arduino and sends it commands to indicate which
         light-sensor and audio inputs are to be sampled
+
+    Provide the Measurer with the TSClientClockController so that the measurer can hook
+    into the controller to get notification of changes in the timeline behaviour reported
+    over CSS_TS.
+
+    Start up the clients (wallclock and TSClientClockController).  These will attempt to connect
+    to their servers, and timeout if unsuccessful.
 
     Wait for the operator to indicate when the client device under test is ready.
 
@@ -70,34 +124,15 @@ The overall process is:
         synchronise and hence get paused because the test system has sent an initial pause
         command over the CSS-TS protocol.
 
-    Once the operator informs the test system to continue, the sync timeline is unpaused,
 
-    This unpausing causes a snapshot to be taken of the wall clock and corresponding sync time line clock
-    that the CSS_TS server passes this on to the CSA.
-
-    In response The CSA synchronises its video play back in accordance with the control timestamp it receives.
-    The CSA adjusts the play back position within the test video and starts playing it.
-
-    The measuring system is not yet enabled to capture the flashes and beeps.
-
-    This python thread sleeps for some time (cmd line argument) to allow the video playback to settle (e.g. there may be
-    repositioning of the video initially once synchronised(.
-
-    The measurer object then starts the capture.
+    The measurer object then starts the capture (it is given the dispersion recorder to
+    use during the capture).
 
         It sends the data capture command to the arduino, which eventually returns once its sample
         buffer is full.  The arduino returns the captured data along with precise timings
         for the start and end of this capture.
 
-    The we pause the sync time line (sets the speed to 0.0) informing the CSA under test
-    over CSS_TS protocol.
-
-    The operator is prompted to enter the worst case wall clock dispersion for the CSA (the CSA could
-    intermittently print out the dispersion).
-
-    This dispersion value is passed to the measurer object.
-
-    The measurer then examines the captured data to find the times of the centre points of the beeps and/or flashes
+   The measurer then examines the captured data to find the times of the centre points of the beeps and/or flashes
     across the channels of data received (one channel per pin).
 
     Finally, the timing for each channel is analysed to find the best match of these centre points (the observed data)
@@ -127,6 +162,12 @@ import stats
 
 
 def createCSSClientObjects(cmdParser):
+    """\
+
+    Create the client objects needed to engage in the CSS-WC and CSS-TS protocols.
+    :param cmdParser the command line parser object
+
+    """
     args = cmdParser.args
     sysclock=SysClock()
     wallClock=TunableClock(sysclock,tickRate=1000000000) # nanos
@@ -149,21 +190,13 @@ def createCSSClientObjects(cmdParser):
     return (ts, timelineClock, args.timelineClockFrequency, wcClient, wallClock, wcPrecisionNanos, dispRecorder)
 
 
-def getWorstCaseDispersion():
+def startCSSClients(wallClockClient, tsClientClockController):
     """\
 
-    prompt the operator to enter the worst case dispersion value
-    observed on the device under test, and return that value
+    Start the wallclock and TS client clock controller.  The CSS protocols
+    commence.
 
-    :returns dispersion value in units of nanoseconds
     """
-
-    print
-    dispersion = 1.9
-    return float(dispersion)*1000000.0
-
-
-def startCSSClients(wallClockClient, tsClientClockController):
     wallClockClient.start()
     tsClientClockController.connect()
 
