@@ -141,11 +141,11 @@ def createCSSClientObjects(cmdParser):
     dispRecorder.start()
 
     print "Connecting, requesting timeline for:"
-    print "   Any contentId beginning with:", args.contentIdStem
+    print "   Any contentId beginning with:", args.contentId
     print "   and using timeline selector: ", args.timelineSelector
     print
 
-    ts = TSClientClockController(args.tsUrl[0], args.contentIdStem, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
+    ts = TSClientClockController(args.tsUrl[0], args.contentId, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
     return (ts, timelineClock, args.timelineClockFrequency, wcClient, wallClock, wcPrecisionNanos, dispRecorder)
 
 
@@ -174,7 +174,8 @@ def startCSSClients(wallClockClient, tsClientClockController):
 
 if __name__ == "__main__":
 
-    from testsetupcmdlineForTVTester import TVTesterCmdLineParser
+    from testsetupcmdline import TVTesterCmdLineParser
+
     import time
 
     cmdParser = TVTesterCmdLineParser()
@@ -191,7 +192,7 @@ if __name__ == "__main__":
     # Arduino Due micros() function precision known to be 1us
     # http://forum.arduino.cc/index.php?PHPSESSID=dulptiubbkqqer7p5hv2fqc583&topic=147505.msg1108517#msg1108517
     acPrecisionNanos = 1000
-    
+
     CONNECT_TIMEOUT = 10.0
     TIMELINE_AVAILABLE_TIMEOUT = 5.0
 
@@ -221,7 +222,7 @@ if __name__ == "__main__":
         if not syncTimelineClockController.connected:
             sys.stderr.write("\nTimed out trying to connect to CSS-TS. Aborting.\n\n")
             sys.exit(1)
-        
+
         print "Connected."
 
         # check we're receiving control timestamps for a valid timeline
@@ -232,21 +233,21 @@ if __name__ == "__main__":
         if not syncTimelineClockController.timelineAvailable:
             sys.stderr.write("\n\nWaited a while, but timeline was not available. Aborting.\n\n")
             sys.exit(1)
-        
+
         print "Synced to timeline."
-        
+
         # finally check if dispersion is sane before proceeding
         currentDispersion = wallClockClient.algorithm.getCurrentDispersion()
         if currentDispersion > 1000000000*1.0:
             sys.stderr.write("\n\nWall clock client synced with dispersion +/- %f.3 milliseconds." % (currentDispersion / 1000000.0))
             sys.stderr.write("\nWhich is greater than +/- 1 second. Aborting.\n\n")
             sys.exit(1)
-        
+
 
         print
         print "Beginning to measure"
         measurer.capture()
-        
+
         # sanity check we are still connected to the CSS-TS server
         if not syncTimelineClockController.connected and syncTimelineClockController.timelineAvailable:
             sys.write("\n\nLost connection to CSS-TS or timeline became unavailable. Aborting.\n\n")
