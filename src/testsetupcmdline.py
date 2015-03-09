@@ -76,7 +76,7 @@ def parsePinArgs(pinArgMap):
     :param pinArgMap: dict mapping pin names to the corresponding command line
     argument value (as parsed by argparse)
 
-    :returns dict mapping pin names ("LIGHT_0","LIGHT_1","AUDIO_0","AUDIO_1") to lists containing expected flash/beep times
+    :returns: dict mapping pin names ("LIGHT_0","LIGHT_1","AUDIO_0","AUDIO_1") to lists containing expected flash/beep times
     read from the metadata file. For pins that are not specified as arguments,
     there will be no entry in the dict.
 
@@ -105,7 +105,7 @@ def createPinArgsMap(args):
     """\
 
     create the dictionary that maps from pin name to json metadata file
-    :return the dictionary
+    :returns: the dictionary
 
     """
     return {
@@ -120,7 +120,7 @@ def extractPinData(args):
     """\
 
     process the command line arguments related to pin inputs to be captured
-    :return (pinArgMap, pinExpectedTimes, pinsToMeasure)
+    :returns: (pinArgMap, pinExpectedTimes, pinsToMeasure)
 
     """
 
@@ -151,8 +151,8 @@ class TVTesterCmdLineParser:
 
         desc = "Measures synchronisation timing for a Master TV using the DVB CSS protocols. Does this by pretending to be the CSA and using an external Arduino microcontroller to take measurements."
         parser = createParserWithCommonArgs(desc)
-        parser.add_argument("tsUrl", action="store", type=dvbcss.util.wsUrl_str, nargs=1, help="ws:// URL of Master TV's CSS-TS end point")
-        parser.add_argument("wcUrl", action="store", type=dvbcss.util.udpUrl_str, nargs=1, help="udp://<host>:<port> URL of Master TV's CSS-WC end point")
+        parser.add_argument("tsUrl", action="store", type=dvbcss.util.wsUrl_str, nargs=1, help="ws:// URL of TV's CSS-TS end point")
+        parser.add_argument("wcUrl", action="store", type=dvbcss.util.udpUrl_str, nargs=1, help="udp://<host>:<port> URL of TV's CSS-WC end point")
         parser.add_argument("wcBindAddr",action="store", type=dvbcss.util.iphost_str, nargs="?",help="IP address or host name to bind WC client to (default="+str(DEFAULT_WC_BIND[0])+")",default=DEFAULT_WC_BIND[0])
         parser.add_argument("wcBindPort",action="store", type=dvbcss.util.port_int_or_random,   nargs="?",help="Port number to bind WC client to (default="+str(DEFAULT_WC_BIND[1])+")",default=DEFAULT_WC_BIND[1])
 
@@ -178,15 +178,18 @@ class TVTesterCmdLineParser:
         for pin in self.pinsToMeasure:
             print "   Measuring input %s using expected timings from : %s" % (pin, self.pinArgMap[pin][0])
         print
-        #print "   CII server at                 : %s" % self.ciiUrl
         print "   TS server at                          : %s" % self.args.tsUrl
         print "   WC server at                          : %s" % self.args.wcUrl
         print "   Content id stem asked of the TV       : %s" % self.args.contentId
         print "   Timeline selector asked of TV         : %s" % self.args.timelineSelector
         print
+        print "   Assuming TV will be at start of video when timeline at : %d ticks" % (self.args.videoStartTicks)
+        print
+        #print "   When go is pressed, will begin measuring immediately for %f seconds" % self.args.measureSecs[0]
+        print "   When go is pressed, will begin measuring immediately."
         print
         if self.args.toleranceSecs[0] is not None:
-            print "   Will report if CSA is accurate within a tolerance of : %f milliseconds" % (self.args.toleranceSecs[0]*1000.0)
+            print "   Will report if TV is accurate within a tolerance of : %f milliseconds" % (self.args.toleranceSecs[0]*1000.0)
             print
 
 
@@ -209,6 +212,7 @@ class CsaTesterCmdLineParser:
         ADDR="127.0.0.1"
         PORT_WC=6677
         PORT_WS=7681
+        WAIT_SECS=5.0
 
         desc = "Measures synchronisation timing for a Companion Screen using the DVB CSS protocols. Does this by pretending to be the TV Device and using an external Arduino microcontroller to take measurements."
         parser = createParserWithCommonArgs(desc)
@@ -222,9 +226,6 @@ class CsaTesterCmdLineParser:
 
         # parse pin data
         self.pinArgMap, self.pinExpectedTimes, self.pinsToMeasure = extractPinData(self.args)
-        self.ciiUrl = ""
-        self.tsUrl = ""
-        self.wcUrl = ""
 
 
 
@@ -236,18 +237,15 @@ class CsaTesterCmdLineParser:
         print out the test setup
 
         """
-        self.ciiUrl = ciiUrl
-        self.wcUrl = wcUrl
-        self.tsUrl = tsUrl
 
         print
         print "Scenario setup:"
         for pin in self.pinsToMeasure:
             print "   Measuring input %s using expected timings from : %s" % (pin, self.pinArgMap[pin][0])
         print
-        print "   CII server at                 : %s" % self.ciiUrl
-        print "   TS server at                  : %s" % self.tsUrl
-        print "   WC server at                  : %s" % self.wcUrl
+        print "   CII server at                 : %s" % ciiUrl
+        print "   TS server at                  : %s" % tsUrl
+        print "   WC server at                  : %s" % wcUrl
         print "   Pretending to have content id : %s" % self.args.contentId
         print "   Pretending to have timeline   : %s" % self.args.timelineSelector
         print "   ... with tick rate            : %d/%d ticks per second" % (self.args.unitsPerSec, self.args.unitsPerTick)
