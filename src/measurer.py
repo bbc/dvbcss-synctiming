@@ -69,7 +69,6 @@ class Measurer:
         self.activatePinReading()
         self.nActivePins  = arduino.prepareToCapture(self.f, wallClock)[0]
 
-        print self.nActivePins, self.pinsToMeasure
         if self.nActivePins != len(self.pinsToMeasure) :
             raise ValueError("# activated pins mismatches request: ")
 

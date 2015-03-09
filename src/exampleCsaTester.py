@@ -367,14 +367,6 @@ if __name__ == "__main__":
     # once servers are started, need to catch keyboard interrupt to close them
     # down in event of ctrl-c to exit the app
     try:
-        print cmdParser.pinsToMeasure, \
-                            cmdParser.pinExpectedTimes, \
-                            cmdParser.args.videoStartTicks, \
-                            servers["wallclock"], \
-                            syncTimelineClock, \
-                            syncClockTickRate, \
-                            wcPrecisionNanos, \
-                            acPrecisionNanos
         measurer = Measurer("master", \
                             cmdParser.pinsToMeasure, \
                             cmdParser.pinExpectedTimes, \
