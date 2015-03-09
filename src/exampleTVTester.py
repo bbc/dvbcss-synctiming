@@ -182,11 +182,11 @@ def createCSSClientObjects(cmdParser):
     dispRecorder.start()
 
     print "Connecting, requesting timeline for:"
-    print "   Any contentId beginning with:", args.contentId
+    print "   Any contentId beginning with:", args.contentIdStem
     print "   and using timeline selector: ", args.timelineSelector
     print
 
-    ts = TSClientClockController(args.tsUrl[0], args.contentId, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
+    ts = TSClientClockController(args.tsUrl[0], args.contentIdStem, args.timelineSelector, timelineClock, correlationChangeThresholdSecs=0.0)
     return (ts, timelineClock, args.timelineClockFrequency, wcClient, wallClock, wcPrecisionNanos, dispRecorder)
 
 
@@ -212,6 +212,8 @@ if __name__ == "__main__":
     import time
 
     cmdParser = TVTesterCmdLineParser()
+    cmdParser.setupArguments()
+    cmdParser.parseArguments()
     cmdParser.printTestSetup()
 
     syncTimelineClockController, \
