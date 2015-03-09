@@ -52,8 +52,8 @@ def createParserWithCommonArgs(desc):
     TOLERANCE = None
     parser=argparse.ArgumentParser(description=desc)
     parser.add_argument("contentId", type=str, help="The contentId the measurement system will pretend to be playing (e.g. \"urn:github.com/bbc/dvbcss-synctiming:sync-timing-test-sequence\")")
-    parser.add_argument("timelineSelector", type=str, help="The timelineSelector for the timeline to be provided (e.g. \"urn:dvb:css:timeline:pts\" for PTS).")
-    parser.add_argument("videoStartTicks", type=int, help="The timeline tick value corresponding to when the CSA is expected to be showing the first frame of the test video sequence.")
+    parser.add_argument("timelineSelector", type=str, help="The timelineSelector for the timeline to be used (e.g. \"urn:dvb:css:timeline:pts\" for PTS).")
+    parser.add_argument("videoStartTicks", type=int, help="The timeline tick value corresponding to when the first frame of the test video sequence is expected to be shown.")
     parser.add_argument("unitsPerTick", type=int, help="The denominator for the timeline tickrate (e.g. 1 for most timelines, such as PTS).")
     parser.add_argument("unitsPerSec", type=int, help="The numerator for the timeline tickrate (e.g. 90000 for PTS).")
     #parser.add_argument("--measureSecs",   dest="measureSecs", type=float, nargs=1, help="Duration of measurement period (default=%4.2f)" % MEASURE_SECS, default=[MEASURE_SECS])
@@ -64,7 +64,7 @@ def createParserWithCommonArgs(desc):
     parser.add_argument("--mfe", \
                         "--maxfreqerror", dest="maxFreqError",  type=int, action="store",default=PPM,help="Set the maximum frequency error for the local wall clock in ppm (default="+str(PPM)+")")
 
-    parser.add_argument("--toleranceTest",dest="toleranceSecs",type=ToleranceOrNone, action="store", nargs=1,help="Do a pass/fail test on whether the CSA is accurately synchronised within this specified tolerance, in milliseconds. Test is not performed if this is not specified.",default=[TOLERANCE])
+    parser.add_argument("--toleranceTest",dest="toleranceSecs",type=ToleranceOrNone, action="store", nargs=1,help="Do a pass/fail test on whether sync is accurate to within this specified tolerance, in milliseconds. Test is not performed if this is not specified.",default=[TOLERANCE])
     return parser
 
 
