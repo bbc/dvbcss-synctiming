@@ -260,11 +260,11 @@ sees coming from the TV.*
    command line parameters. For example (split over multiple lines for ease of
    reading):
 
-        $ python src/exampleTvTester.py ws://192.168.1.23:7681/ts          \
+        $ python src/exampleTVTester.py ""                                 \
+                                        "urn:dvb:css:timeline:pts" 1 90000 \
+                                        12345678                           \
+                                        ws://192.168.1.23:7681/ts          \
                                         udp://192.168.1.23:6677            \
-                                        ""                                 \
-                                        "urn:dvb:css:timeline:pts"         \
-                                        90000                              \
                                         --light0 metadata.json             \
                                         --audio0 metadata.json             \
                                         --toleranceTest 23.0
@@ -277,7 +277,8 @@ sees coming from the TV.*
       
      * ... and to request (via CSS-TS) to synchronise to a PTS timeline:
        * denoted by timeline selector value of "urn:dvb:css:timeline:pts"
-       * with a tick rate of 90000 ticks per second
+        * with a tick rate of 1 unit per tick and 90000 units per second
+         (meaning 90000/1 ticks per second)
        * asking that the timeline be available from the TV irrespective
          of what content is showing
          (a contentIdStem of the empty string "" will match any content ID)

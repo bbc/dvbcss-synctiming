@@ -87,9 +87,9 @@ class BaseCmdLineParser(object):
         """
 
         self.parser.add_argument("timelineSelector", type=str, help="The timelineSelector for the timeline to be used (e.g. \"urn:dvb:css:timeline:pts\" for PTS).")
-        self.parser.add_argument("videoStartTicks", type=int, help="The timeline tick value corresponding to when the first frame of the test video sequence is expected to be shown.")
         self.parser.add_argument("unitsPerTick", type=int, help="The denominator for the timeline tickrate (e.g. 1 for most timelines, such as PTS).")
         self.parser.add_argument("unitsPerSec", type=int, help="The numerator for the timeline tickrate (e.g. 90000 for PTS).")
+        self.parser.add_argument("videoStartTicks", type=int, help="The timeline tick value corresponding to when the first frame of the test video sequence is expected to be shown.")
         #self.parser.add_argument("--measureSecs",   dest="measureSecs", type=float, nargs=1, help="Duration of measurement period (default=%4.2f)" % MEASURE_SECS, default=[MEASURE_SECS])
         self.parser.add_argument("--light0",   dest="light0_metadatafile", type=str, nargs=1, help="Measure light sensor input 0 and compare to expected flash timings in the named JSON metadata file.")
         self.parser.add_argument("--light1",   dest="light1_metadatafile", type=str, nargs=1, help="Measure light sensor input 1 and compare to expected flash timings in the named JSON metadata file.")
