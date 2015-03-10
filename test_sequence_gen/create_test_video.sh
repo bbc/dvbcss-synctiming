@@ -27,7 +27,7 @@
 #
 # known to NOT work with avconv from ubuntu 14.04
 
-FFMPEG=`which ffmpeg avconv | head`
+FFMPEG=`which ffmpeg avconv | head -n 1`
 if [ -z "$FFMPEG" ]; then
 	echo "Need to have ffmpeg or avconv installed and in the path to run." >&2
 	exit 1
