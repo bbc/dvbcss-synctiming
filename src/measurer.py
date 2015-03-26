@@ -34,7 +34,7 @@ class DubiousInput(Exception):
 
 class Measurer:
 
-    def __init__(self, role, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate, wcPrecisionNanos, acPrecisionNanos):
+    def __init__(self, role, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate, wcPrecisionNanos, acPrecisionNanos, captureSecs):
         """\
 
         connect with the arduino and send commands on which pins are to be read during
@@ -52,6 +52,7 @@ class Measurer:
         :param syncTimelineTickRate: tick rate of the sync timeline
         :param wcPrecisionNanos the wall clock precision in nanoseconds
         :param acPrecisionNanos the arduino clock's precision in nanoseconds
+        :param captureSecs length of the capture to be taken on arduino in seconds
         """
 
         self.role = role
@@ -67,7 +68,7 @@ class Measurer:
         self.f = arduino.connect()
         self.pinMap = {"LIGHT_0": 0, "AUDIO_0": 1, "LIGHT_1": 2, "AUDIO_1": 3}
         self.activatePinReading()
-        self.nActivePins  = arduino.prepareToCapture(self.f, wallClock)[0]
+        self.nActivePins  = arduino.prepareToCapture(self.f, wallClock, captureSecs)[0]
 
         if self.nActivePins != len(self.pinsToMeasure) :
             raise ValueError("# activated pins mismatches request: ")

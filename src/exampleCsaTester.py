@@ -349,7 +349,7 @@ if __name__ == "__main__":
     cmdParser = CsaTesterCmdLineParser()
     cmdParser.setupArguments()
     cmdParser.parseArguments()
-    
+
     servers = createServers(cmdParser.args)
     cmdParser.printTestSetup(servers["ciiServer"][1], servers["wcServer"][1], servers["tsServer"][1])
 
@@ -375,7 +375,8 @@ if __name__ == "__main__":
                             syncTimelineClock, \
                             syncClockTickRate, \
                             wcPrecisionNanos, \
-                            acPrecisionNanos)
+                            acPrecisionNanos, \
+                            cmdParser.measurerTime)
 
         print
         raw_input("Press RETURN once CSA is connected and synchronising to this 'TV Device' server")
@@ -398,10 +399,10 @@ if __name__ == "__main__":
         servers["tsServer"][0].updateAllClients()
 
         worstCaseDispersion = getWorstCaseDispersionFromDeviceUnderTest()
-        
+
         def dispersionFunc(wcTime):
             return worstCaseDispersion
-        
+
         measurer.detectBeepsAndFlashes(dispersionFunc = dispersionFunc)
 
         for channel in measurer.getComparisonChannels():

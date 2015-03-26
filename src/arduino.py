@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 #
 # Copyright 2015 British Broadcasting Corporation
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -97,8 +97,34 @@ CMD_PREPARE_TO_CAPTURE = "4"
 CMD_TIMEONLY = "T"
 CMDS_ENABLE_PIN = [ '0', '1', '2', '3' ]
 
+# ----- ARDUINO INFORMATION ---------------------------------------------------
+# the number of bytes needed per pin sample
+
+BLK_SIZE_PER_PIN = 2
+NINETY_KB = (90 * 1024)
+
 # -----------------------------------------------------------------------------
 
+def checkCaptureTimeAchievable(captureTimeSecs, nPinsRequested):
+    """\
+    The user can control how long data capture runs for.
+
+    Check if the capture time can be accomodated, given the number of pins
+    that will be sampled.
+
+    :param captureTimeSecs the number of seconds to run the capture for.
+        If this value is -1, then compute the capture time based on the number of pins requested.
+    :param nPinsRequested the number of pins to capture data from
+
+    :return -1 if this request is impossible, else the number of seconds that will be captured
+    """
+    if captureTimeSecs == -1:
+        return (int)(float(NINETY_KB) / float(1000 * nPinsRequested * BLK_SIZE_PER_PIN))
+
+    if captureTimeSecs * 1000 * nPinsRequested * BLK_SIZE_PER_PIN <= NINETY_KB:
+        return captureTimeSecs
+
+    return -1
 
 
 def getInt(f):
@@ -106,7 +132,7 @@ def getInt(f):
     Read a 4 byte integer sent by the Arduino
 
     :param f: file handle for the serial connection to the Arduino Due
-    
+
     :returns value: 32-bit unsigned integer (read as 4 bytes, most significant byte first)
     """
     n=f.read(4)
@@ -120,7 +146,7 @@ def getIntWithTime(f, clock):
 
     :param f: file handle for the serial connection to the Arduino Due
     :param clock: a :class:`dvbcss.clock` clock object
-    
+
     :returns (value, ticks): A tuple containing the read 32-bit unsigned integer (see :func:`getInf`) and the tick value of the supplied clock object
     """
     n=f.read(4)
@@ -129,32 +155,37 @@ def getIntWithTime(f, clock):
     return v, t4
 
 
-def writeCmdAndTimeRoundTrip(f, clock, cmd):
-    """\ 
+def writeCmdAndTimeRoundTrip(f, clock, cmd, captureTime=None):
+    """\
     Send a command byte to the Arduino, and return a 4-tuple reflecting local
     and arduino times measured for round trip.
-    
+
     :param f: file handle for the serial connection to the Arduino Due
     :param clock: a :class:`dvbcss.clock` clock object
-    :param cmd: The command to send to the ARduino.
-    
+    :param cmd: The command to send to the Arduino.
+    :param captureTime: if this is the command to prepare for capture, then here is the time in seconds
+        otherwise this is None
+
     We measure the value of clock.tick just prior to sending the command byte.
     The Arduino measures its local time (using its micros() function) as soon as data is available on
     the serial USB port. It immediately sends that time back, flushing the serial USB port, then reads
     the command byte.
-    
+
     We read that time value sent by the arduino, and immediately read the supplied clock object again.
-    
+
     :returns (t1,t2,t3,t4): Where t1 and t4 are in terms of the supplied clock object and t2 and t3 are from the Arduino.
-    
+
     Where:
     * t1 is the clock.ticks value from just before the command was sent
     * t2 and t3 are the arduino micros() time value from when the comand was received
     * t4 is the clock.ticks value from just after the response was received from the Arduino.
-    
+
     All returned Ardinio time values are in units of nanoseconds. The clock object times are in units of ticks of that clock.
     """
     t1 = clock.ticks
+    if captureTime != None:
+        # concatenate and send as one string to reduce wait for the value of capture time on arduino
+        cmd = cmd + chr(captureTime)
     f.write(cmd)
     arduinoArrivalTime, t4 = getIntWithTime(f, clock)
     # convert to nanosecs
@@ -170,9 +201,9 @@ def writeCmdAndTimeRoundTrip(f, clock, cmd):
 def connect():
     """\
     Connect to Arduino via serial and return a file handle for communicating with it.
-    
+
     :returns: file handle for the serial connection
-    
+
     :raises RuntimeError: if unable to detect a connected Arduino Due
     """
     for (COMMS_CHANNEL, NAME, deviceId) in serial.tools.list_ports.comports():
@@ -183,49 +214,53 @@ def connect():
 
 
 
-def prepareToCapture(f, clock):
+def prepareToCapture(f, clock, captureSecs):
     """\
     Retrieve information from the arduino on what will be captured if :func:`capture` is called.
-    
+
+    Pre-condition: the caller must have checked previously that the capture time is achievable
+    for the number of pins being sampled, by calling checkCaptureTimeAchievable() above
+
     :param f: file handle for the serial connection to the Arduino Due
     :param clock: a :class:`dvbcss.clock` clock object
+    :param captureSecs the number of seconds to capture from the pin(s)
 
-    The Arduino then computes the number of blocks of data the arduino will collect during capture(),
+    The Arduino then checks it has enough memory to handle the requested  capture(),
     initialises this data area, and writes back :
-    
+
     1) The number of pins its going to be reading during capture()
     as determined by prior calls to samplePinDuringCapture()
-    
+
     2) The number of data blocks that will be captured during capture().  One data block
-    holds the observed high and low values sampled for all enabled pin during one millisecond.
+    holds the observed high and low values sampled for all enabled pins during one millisecond.
     See :func:`capture` for the format of these blocks.
-    
+
     :returns: tuple (nActivePorts, nMilliBlocks, timingData)
-    
+
     The return tuple contains:
     * the number of analogue pins that will be read (-1 means there's a problem),
     * the number of milliseconds that will be sampled,
     * round-trip timing data
-    
+
     See :func:`writeAndTimeRoundTrip` for details of the meaning of the returned round-trip timing data
-    
+
     """
     # send the cmd "4" ... chr(4 + 48)
-    timeData = writeCmdAndTimeRoundTrip(f, clock, CMD_PREPARE_TO_CAPTURE)
+    timeData = writeCmdAndTimeRoundTrip(f, clock, CMD_PREPARE_TO_CAPTURE, captureSecs)
     nActivePorts = getInt(f)
     nMilliBlocks = getInt(f)
     return nActivePorts, nMilliBlocks, timeData
- 
-    
+
+
 def samplePinDuringCapture(f, pin, clock):
     """\
     Configure Arduino to enable sampling of a particular light sensor or audio
     signal input pin. Only enabled pins are read when capture() is subsequently called.
-    
+
     :param f: file handle for the serial connection to the Arduino Due
     :param pin: The pin to enable.
     :param clock: a :class:`dvbcss.clock` clock object
-    
+
     Values for the pin parameter:
     * 0 enables reading of light sensor 0 (on Arduino analogue pin 0).
     * 1 enables reading of audio input 0 (on Arduino analogue pin 1).
@@ -235,7 +270,7 @@ def samplePinDuringCapture(f, pin, clock):
     :returns: (t1,t2,t3,t4) measuring the specified clock object and arduino clock, as per :func`writeCmdAndTimeRoundTrip`
 
     See :func:`writeAndTimeRoundTrip` for details of the meaning of the returned round-trip timing data
-    
+
     """
     CMD = CMDS_ENABLE_PIN[pin]
     return writeCmdAndTimeRoundTrip(f, clock, CMD)
@@ -245,79 +280,79 @@ def samplePinDuringCapture(f, pin, clock):
 def capture(f, clock):
     """\
     Instruct the arduino to start capturing sample data.
-    
+
     This function returns information about the capturing process (when capturing
     began and ended, and how many millisecond samples were captured).
-    
+
     Afterwards, you must call bulkTransfer() to retrieve the sample data itself.
-    
+
     :param f: file handle for the serial connection to the Arduino Due
     :param clock: a :class:`dvbcss.clock` clock object
-    
-    
-    
+
+
+
     The number of millisecond blocks the Arduino captures
-    depends how many pins are requested to be sampled (see samplePinDuringCapture() ).  
-   
+    depends how many pins are requested to be sampled (see samplePinDuringCapture() ).
+
     One millisecond block will hold the high and low values sampled
     for each pin, within one millisecond.  With 4 pins enabled, one
     millisecond block will hold 8 bytes.
-   
-    Each pin's data contributes 2 bytes per block.  
-   
+
+    Each pin's data contributes 2 bytes per block.
+
     One pin's data block is stored in ascending byte addresses
-    as "high" value, then "low" value, as observed over a millisecond.  
-   
+    as "high" value, then "low" value, as observed over a millisecond.
+
     For each enabled pin, the data blocks within the millisecond block are organised so that, if pin A < pin B,
     A's data block appears before B's in the millisecond block.
-   
+
     In response, the arduino reads the local time (using micros) and remembers this microsecond value as the start time
     and immediately starts capturing the sample data.
-   
+
     Once complete, the finish time (in microseconds) is measured.
-   
+
     The Arduino then sends back the start time when data capture commenced,
     followed by the finish time, followed by the number of millisecond blocks captured.
-   
+
     :returns tuple (startTime, finishTime, nMilliblocks, preStartTimingData, postFinshTimingData)
-    
+
     The return tuple contains:
-    * Arduino clock time (in nanoseconds) when sampling commenced, 
-    * Arduino clock time (in nanoseconds) when sampling ended, 
+    * Arduino clock time (in nanoseconds) when sampling commenced,
+    * Arduino clock time (in nanoseconds) when sampling ended,
     * The number of millisecond of data sampled
     * The round-trip the timing data (t1,t2,t3,t4) when capture command was sent to the Arduino
     * The round-trip the timing data (t1,t2,t3,t4) just after the sampling finished
-   
+
     See :func:`writeAndTimeRoundTrip` for details of the meaning of the returned round-trip timing data
     """
-    
+
     timeDataPre = writeCmdAndTimeRoundTrip(f, clock, CMD_CAPTURE)
-    
+
     # retrieve the times the Arduino says it started and finished sampling
     # and normalise to nanoseconds (from microseconds)
     dueStartBoundary = getInt(f) * 1000
     dueFinished = getInt(f) * 1000
-        
+
     # retrieve the count of the number of millisecond blocks the Arduino says it sampled
     nMilliBlocks = getInt(f)
     timeDataPost = writeCmdAndTimeRoundTrip(f, clock, CMD_TIMEONLY)
-    
+
     # watch out for any wrapping of the arduino clock ... unlikely but possible
     if timeDataPre[2] < timeDataPre[1]:
         timeDataPre[2] += (1000 * (2 ** 32))
-    
+
     if dueStartBoundary < timeDataPre[2]:
         dueStartBoundary += (1000 * (2 ** 32))
-        
+
     if dueFinished < dueStartBoundary:
         dueFinished += (1000 * (2 ** 32))
-    
+
     if timeDataPost[1] < dueFinished:
         timeDataPost[1] += (1000 * (2 ** 32))
-    
+
     if timeDataPost[2] < timeDataPost[1]:
         timeDataPost[2] += (1000 * (2 ** 32))
-    
+
     return dueStartBoundary, dueFinished, nMilliBlocks, timeDataPre, timeDataPost
 
 
@@ -325,14 +360,14 @@ def capture(f, clock):
 def bulkTransfer(f, clock):
     """\
     Request the Arduino send the captured sample data blocks and return them.
-    
+
     :param f: file handle for the serial connection to the Arduino Due
     :param clock: a :class:`dvbcss.clock` clock object
-    
+
     The arduino transfers the microsecond blocks it's created during the most
     recent call to :func:`capture`. The data is formatted as a single string
     containing the raw bytes of sample data.
-    
+
     :returns tuple (numSamples, (rawSampleData, timingData))
 
     See :func:`writeAndTimeRoundTrip` for details of the meaning of the returned round-trip timing data
@@ -341,10 +376,10 @@ def bulkTransfer(f, clock):
     timeData = writeCmdAndTimeRoundTrip(f, clock, CMD_BULK)
     n = getInt(f)
     samples = f.read(n)
-    return samples, timeData   
+    return samples, timeData
 
 
-   
+
 if __name__=="__main__":
     print "This is a library of functions for communicating with the arduino"
     print "for timing reference-point calibration for video and audio."
