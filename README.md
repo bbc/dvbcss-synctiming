@@ -267,7 +267,8 @@ sees coming from the TV.*
                                         udp://192.168.1.23:6677            \
                                         --light0 metadata.json             \
                                         --audio0 metadata.json             \
-                                        --toleranceTest 23.0
+                                        --toleranceTest 23.0		   \
+					--measureSecs 15
    
     This instructs the measurement system to:
 
@@ -295,6 +296,15 @@ sees coming from the TV.*
      * Report on whether the timing was accurate enough to be within a
        tolerance of +/- 23 milliseconds (after error bounds of measurement
        are taken into account)
+
+     * Capture 15 seconds of data presented to the Arduino inputs specified above.
+       If this option is omitted, the arduino measures up to 45 seconds of input
+       data, depending on the number of pins specified.  For each pin, 2 bytes of
+       data are created every millisecond (the observed high and low values for
+       a pin during that millisecond).  There is a 90 KB buffer available for gathering
+       all this data.  The amount of time requested, based on the number of pins
+       being measured, must not represent more than this 90 KB, else the harness
+       will refuse to run.  The amount of time is an integer.
    
     (For more information on the command line arguments, use the `--help`
     option) 
