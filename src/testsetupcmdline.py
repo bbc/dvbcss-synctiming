@@ -136,7 +136,7 @@ class BaseCmdLineParser(object):
         # see if the requested time for measuring can be accomodated by the system
         self.measurerTime = arduino.checkCaptureTimeAchievable(self.args.measureSecs[0], len(self.pinsToMeasure))
         if self.measurerTime < 0:
-            sys.stderr.write("\nAborting.  The combination of measured time and pins to measure exceeds the measurement system's capabilities.")
+            sys.stderr.write("\nAborting.  The combination of measured time and pins to measure exceeds the measurement system's capabilities.\n\n")
             sys.exit(1)
 
 def _loadExpectedTimeMetadata(pinMetadataFilenames):
