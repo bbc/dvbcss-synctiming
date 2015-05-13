@@ -177,10 +177,12 @@ based method to detect rising and falling edges in the data. The mid point
 between the rising and falling edges is considered to be the time of (the
 middle of) the flash or beep.
 
-The detector code applies a small amount of hold time (1ms for beeps, 4ms for
-flashes). If a falling edge is detected but the data rises again after less
-than the hold time, then the falling edge is considered spurious (e.g. due to
-backlight modulation) and is ignored.
+The detector code applies a small amount of hold time. If a falling edge is
+detected but the data rises again after less than the hold time, then the
+falling edge is considered spurious (e.g. due to backlight modulation) and
+is ignored.
+
+This hold time is set to x0.5 the duration of the flashes or beeps.
 
 
 ### How are observed timings translated to be on the DVB CSS timeline?
@@ -269,11 +271,14 @@ where it came from within the test video sequence, even if the TV/CSA was
 ahead or behind by several seconds.
 
 When the test video sequence is generated, there is also a JSON metadata file
-that includes a list of the times at which the flashes/beeps occur.
+that includes a list of the times at which the flashes/beeps occur and their duration.
 
 The analysis code translates these timings to also be on the timeline, using
 the information supplied about the choice of timeline, its tick rate, and
 what timeline value corresponds to the start of the video.
+
+As mentioned earlier, the pulse detection algorithm also uses the information
+about the duration of flashes and beeps to tune itself.
 
 The set of observed timings of flashes/beeps are then compared against this
 using a correlation algorithm. It is assumed that no flashes or beeps are
