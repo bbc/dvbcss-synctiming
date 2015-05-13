@@ -277,7 +277,7 @@ if __name__ == "__main__":
     black=(0,0,0)
     white=(255,255,255)
     idealFlashDurationSecs = flashNumDurationFrames/fps
-    
+
     # obtain a generator that can yield a never ending stream of flash timings
     eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
 
@@ -330,6 +330,8 @@ if __name__ == "__main__":
         "durationSecs" : sequenceDurationSecs,
         "patternWindowLength" : seqBitLen,
         "eventCentreTimes" : timings,
+        "approxBeepDurationSecs" : idealBeepDurationSecs,
+        "approxFlashDurationSecs" : idealFlashDurationSecs,
     }
 
     jsonString = json.dumps(metadata)

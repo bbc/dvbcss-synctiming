@@ -34,7 +34,7 @@ class DubiousInput(Exception):
 
 class Measurer:
 
-    def __init__(self, role, pinsToMeasure, expectedTimings, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate, wcPrecisionNanos, acPrecisionNanos, captureSecs):
+    def __init__(self, role, pinsToMeasure, expectedTimings, eventDurations, videoStartTicks, wallClock, syncTimelineClock, syncTimelineTickRate, wcPrecisionNanos, acPrecisionNanos, captureSecs):
         """\
 
         connect with the arduino and send commands on which pins are to be read during
@@ -45,6 +45,7 @@ class Measurer:
                 a name must be one of "LIGHT_0", "LIGHT_1", "AUDIO_0" or "AUDIO_1"
         :param expectedTimings  dict mapping pin names ("LIGHT_0","LIGHT_1","AUDIO_0","AUDIO_1") to lists containing expected flash/beep times
         read from a json metadata file. For pins that are not specified as arguments, there will be no entry in the dict.
+        :param eventdurations dict mapping pin names to the expected duration of the flash/beep in seconds (e.g. 0.001 = 1 millisecond)
         :param videoStartTicks initial sync time line clock value
         :param wallClock the wall clock object.  This will be used in arduino.py
                 to take various time snapshots
@@ -58,6 +59,7 @@ class Measurer:
         self.role = role
         self.pinsToMeasure = pinsToMeasure
         self.expectedTimings = expectedTimings
+        self.eventDurations = eventDurations
         self.videoStartTicks = videoStartTicks
         self.wallClock = wallClock
         self.syncTimelineClock = syncTimelineClock
@@ -192,7 +194,11 @@ class Measurer:
             measured by the CSA. When testing a TV, it should be the dispersion
             reported by the local wall clock client algorithm in the measuring system.
         """
+        # add hint about duration of flashes/beeps to self.channels
+        for pinName in self.eventDurations:
+            self.channels[self.pinMap[pinName]]["eventDuration"] = self.eventDurations[pinName]
 
+        # run detection process
         detector = detect.BeepFlashDetector(self.wcAcReqResp, self.syncClockTickRate, \
                                             self.wcSyncTimeCorrelations, dispersionFunc, \
                                             self.wcPrecisionNanos, self.acPrecisionNanos)

@@ -370,6 +370,7 @@ if __name__ == "__main__":
         measurer = Measurer("master", \
                             cmdParser.pinsToMeasure, \
                             cmdParser.pinExpectedTimes, \
+                            cmdParser.pinEventDurations, \
                             cmdParser.args.videoStartTicks, \
                             servers["wallclock"], \
                             syncTimelineClock, \

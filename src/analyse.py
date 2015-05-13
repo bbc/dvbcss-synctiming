@@ -218,7 +218,8 @@ def runDetection(detector, channels, dueStartTimeUsecs, dueFinishTimeUsecs):
             func = detector.samplesToBeepTimings
         else:
             func = detector.samplesToFlashTimings
-        timings.append({"pinName": channel["pinName"], "observed": func(channel["min"], channel["max"], dueStartTimeUsecs, dueFinishTimeUsecs)})
+        eventDuration = channel["eventDuration"]
+        timings.append({"pinName": channel["pinName"], "observed": func(channel["min"], channel["max"], dueStartTimeUsecs, dueFinishTimeUsecs, eventDuration)})
     return timings
 
 

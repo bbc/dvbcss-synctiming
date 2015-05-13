@@ -126,7 +126,7 @@ class BaseCmdLineParser(object):
         }
 
         # load in the expected times for each pin being sampled, and also build a list of which pins are being sampled
-        self.pinExpectedTimes = _loadExpectedTimeMetadata(self.pinMetadataFilenames)
+        self.pinExpectedTimes, self.pinEventDurations = _loadExpectedTimeMetadata(self.pinMetadataFilenames)
         self.pinsToMeasure = self.pinExpectedTimes.keys()
 
         if len(self.pinsToMeasure) == 0:
@@ -155,6 +155,7 @@ def _loadExpectedTimeMetadata(pinMetadataFilenames):
 
     """
     pinExpectedTimes = {}
+    pinEventDurations = {}
     try:
         for pinName in pinMetadataFilenames:
             argValue = pinMetadataFilenames[pinName]
@@ -164,13 +165,19 @@ def _loadExpectedTimeMetadata(pinMetadataFilenames):
                 metadata = json.load(f)
                 f.close()
                 pinExpectedTimes[pinName] = metadata["eventCentreTimes"]
+                if "AUDIO" in pinName:
+                    pinEventDurations[pinName] = metadata["approxBeepDurationSecs"]
+                elif "LIGHT" in pinName:
+                    pinEventDurations[pinName] = metadata["approxFlashDurationSecs"]                
+                else:
+                    raise ValueError("Did not recognise pin type (audio or light). Could not determine which field to read from metadata")
     except IOError:
         sys.stderr.write("\nCould not open one of the specified JSON metadata files.\n\n")
         sys.exit(1)
     except ValueError:
         sys.stderr.write("\nError parsing contents of one of the JSON metadata files. Is it correct JSON?\n\n")
         sys.exit(1)
-    return pinExpectedTimes
+    return pinExpectedTimes, pinEventDurations
 
 
 
