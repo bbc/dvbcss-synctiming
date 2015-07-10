@@ -135,8 +135,21 @@ def parseSampleRate(arg):
     if v<10000:
         raise ValueError("Sample rate must be at least 10kHz.")
     return v
-    
-    
+
+def parseRGB(arg):
+    match = re.match(r"^([0-9]+), *([0-9]+), *([0-9]+)$", arg)
+    if not match:
+        raise ValueError("Colour argument not in expected format R,G,B, e.g. 255,0,128 (note: no spaces between values)")
+    else:
+        r = int(match.group(1))
+        g = int(match.group(2))
+        b = int(match.group(3))
+        if r<0 or r>255 or g<0 or g>255 or b<0 or b>255:
+            print "XXX"
+            raise ValueError("Colour values must be between 0 and 255 (inclusive)")
+        else:
+            return r,g,b
+
 
 if __name__ == "__main__":
 
@@ -207,6 +220,36 @@ if __name__ == "__main__":
         type=str,
         default=[METADATA_FILENAME],
         help="Filename for writing the JSON file containing metadata and beep/flash timings. Default=\"%s\"" % METADATA_FILENAME)
+
+    parser.add_argument(
+        "--title", dest="TITLE_TEXT", action="store", nargs=1,
+        type=str,
+        default=[""],
+        help="A title to be included in every video frame. Default=''")
+        
+    parser.add_argument(
+        "--title-colour", dest="TITLE_COLOUR", action="store", nargs=1,
+        type=parseRGB,
+        default=[(255,255,255)],
+        help="Colour for the title text as an R,G,B each between 0 and 255. Default=\"255,255,255\" (white)")
+        
+    parser.add_argument(
+        "--bg-colour", dest="BG_COLOUR", action="store", nargs=1,
+        type=parseRGB,
+        default=[(0,0,0)],
+        help="Colour for the background as R,G,B each between 0 and 255. Default=\"0,0,0\" (black)")
+    
+    parser.add_argument(
+        "--text-colour", dest="TEXT_COLOUR", action="store", nargs=1,
+        type=parseRGB,
+        default=[(255,255,255)],
+        help="Colour for the general text labels as an R,G,B each between 0 and 255. Default=\"255,255,255\" (white)")
+        
+    parser.add_argument(
+        "--vi-colour", dest="GFX_COLOUR", action="store", nargs=1,
+        type=parseRGB,
+        default=[(255,255,255)],
+        help="Colour for the visual indicator elements (moving blocks etc) as R,G,B each between 0 and 255. Default=\"255,255,255\" (white)")
     
     args = parser.parse_args()
     
@@ -221,6 +264,11 @@ if __name__ == "__main__":
     frameFilenames = args.FRAME_FILENAME_PATTERN[0]
     audioFilename = args.AUDIO_FILENAME[0]
     metadataFilename = args.METADATA_FILENAME[0]
+    title_text = args.TITLE_TEXT[0]
+    title_colour = args.TITLE_COLOUR[0]
+    bg_colour = args.BG_COLOUR[0]
+    gfx_colour = args.GFX_COLOUR[0]
+    text_colour = args.TEXT_COLOUR[0]
     
     # check output directories exist
     for filename, purpose in [ (frameFilenames,   "frame images"),
@@ -240,8 +288,16 @@ if __name__ == "__main__":
     print "   Filename for PNG frames:    %s " % frameFilenames
     print "   Filename for WAV audio:     %s " % audioFilename
     print "   Filename for JSON metadata: %s " % metadataFilename
+    print "   Text colour:                %d %d %d " % text_colour
+    print "   Visual indicators colour:   %d %d %d " % gfx_colour
+    print "   Background colour:          %d %d %d " % bg_colour
+    if title_text != "":
+        print "   Title:                      %s" % title_text
+        print "   Title colour:               %d %d %d " % title_colour
+    else:
+        print "   No title."
     print ""
-    
+
     # -----------------------------------------------------------------------
     
     # FIRST generate a WAV file containing audio with beeps of a fixed duration
@@ -284,6 +340,10 @@ if __name__ == "__main__":
     # provide that as input to a new generator that yields a stream of
     # pixel colours for the flash for each frame. black=no flash. white=flash
     flashSequence = genFlashSequence(eventCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, fps, black, white)
+    
+    # do a second version for the pip train using the gfx and bg colors
+    eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
+    pipTrainSequence = genFlashSequence(eventCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, fps, bg_colour, gfx_colour)
 
     flashSequence = list(flashSequence) # flatten so we can know the length
     frameNum=0
@@ -295,7 +355,8 @@ if __name__ == "__main__":
     # will yield a sequence of image frames
     
     numFrames = len(flashSequence)
-    frames = genFrameImages(pixelsSize, flashSequence, numFrames, fps)
+    frames = genFrameImages(pixelsSize, flashSequence, pipTrainSequence, numFrames, fps, \
+        BG_COLOUR=bg_colour, GFX_COLOUR=gfx_colour, TEXT_COLOUR=text_colour, title=title_text, TITLE_COLOUR=title_colour )
     n=0
     for frame in frames:
         print "    Generating and saving frame %d of %d" % (n, numFrames-1)    

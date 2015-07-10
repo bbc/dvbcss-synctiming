@@ -190,16 +190,22 @@ def precise_filled_pieslice(draw, xy, start, end, *options, **kwoptions):
         draw.polygon([centre, p1, p2, centre], *options, **kwoptions)
         
 
-def genFrameImages((widthPixels, heightPixels), flashColourGen, numFrames, FPS, superSamplingScale=8):
+def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255)):
     """\
     Generator that yields PIL Image objects representing video frames, one at a time
     
     :param (widthPixels, heightPixels): desired dimensions (in pixels) of the image as a tuple
     :param flashColourGen: a list or iterable (e.g. generator) that returns the colour to use for the flashing box
+    :param flashCOlourGen: a list or iterable (e.g. generator) that returns the colour to use for the pip train
     :param numFrames: the number of frames to create
     :param FPS: the frame rate
     :param superSamplingScale: Scale factor used to achieve anti-aliasing. e.g. 8 means the image will be drawn x8 too large then scaled down by a factor of 8 to smooth it before it is yielded
-
+    :param BG_COLOUR: background colour as (r,g,b) tuple
+    :param TEXT_COLOUR: text label colour as (r,g,b) tuple
+    :param GFX_COLOUR: colour for graphical indicators (except the pips) as (r,g,b) tuple
+    :param title: title text label
+    :param TITLE_COLOUR: colour for the title text as (r,g,b) tuple
+    
     :returns: Generator that yields a PIL.Image object for every frame in sequence
     """
 
@@ -211,6 +217,7 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, numFrames, FPS, 
     height = heightPixels * superSamplingScale
 
     flashCols = list(flashColourGen)[0:numFrames]
+    flashColsPipTrain = list(flashColourGenPipTrain)[0:numFrames]
 
     # we'll pretend we're working within a rectangle (0,0) - (160,90)
     # and use a scaling function to map to out actual dimensions
@@ -230,57 +237,57 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, numFrames, FPS, 
         durationTimecode = frameNumToTimecode(numFrames, FPS)
 
         # create black image and an object to let us draw on it
-        img = Image.new("RGB", (width, height), color=BLACK)
+        img = Image.new("RGB", (width, height), color=BG_COLOUR)
         draw = ImageDraw.Draw(img)
 
         # draw a flashing rectangular box on the left side
         flashColour = flashCols[frameNum]
         topLeft     = scaler.xy((10, 30))
         bottomRight = scaler.xy((40, 60))
-        draw.rectangle(topLeft + bottomRight, outline=None, fill=WHITE)
+        draw.rectangle(topLeft + bottomRight, outline=None, fill=GFX_COLOUR)
         topLeft     = scaler.xy((11, 31))
         bottomRight = scaler.xy((39, 59))
         draw.rectangle(topLeft + bottomRight, outline=None, fill=flashColour)
 
         # draw text label explaining to attach light sensor to the flashing box
         topLeft     = scaler.xy((41, 37))
-        draw.text(topLeft, "Use light detector", font=font, fill=WHITE)
+        draw.text(topLeft, "Use light detector", font=font, fill=TEXT_COLOUR)
         topLeft     = scaler.xy((41, 42))
-        draw.text(topLeft, "on centre of", font=font, fill=WHITE)
+        draw.text(topLeft, "on centre of", font=font, fill=TEXT_COLOUR)
         topLeft     = scaler.xy((41, 47))
-        draw.text(topLeft, "this box", font=font, fill=WHITE)
+        draw.text(topLeft, "this box", font=font, fill=TEXT_COLOUR)
 
         # draw text labels giving frame number, timecode and seconds covered by this frame
         topLeft = scaler.xy((10, 4))
-        draw.text(topLeft, timecode, font=font, fill=WHITE)
+        draw.text(topLeft, timecode, font=font, fill=TEXT_COLOUR)
         topLeft = scaler.xy((10, 10))
-        draw.text(topLeft, "%06d of %d frames" % (frameNum, numFrames), font=font, fill=WHITE)
+        draw.text(topLeft, "%06d of %d frames" % (frameNum, numFrames), font=font, fill=TEXT_COLOUR)
         topLeft = scaler.xy((10, 16))
-        draw.text(topLeft, u"%08.3f \u2264 t < %08.3f secs" % (timeSecs, nextTimeSecs), font=font, fill=WHITE)
+        draw.text(topLeft, u"%08.3f \u2264 t < %08.3f secs" % (timeSecs, nextTimeSecs), font=font, fill=TEXT_COLOUR)
+
+        topLeft = scaler.xy((10,65))
+        draw.text(topLeft, "Duration: " + durationTimecode, font=font, fill=TEXT_COLOUR)
+        topLeft = scaler.xy((10,70))
+        draw.text(topLeft, "%d fps" % FPS, font=font, fill=TEXT_COLOUR)
         
         # and more text labels, but this time right justified
-        text = "Duration: " + durationTimecode
-        w,h=font.getsize(text)
-        topLeft = scaler.xy((150, 4))
+        text = title
+        w,h = font.getsize(text)
+        topLeft = scaler.xy((150,4))
         topLeft = topLeft[0] - w, topLeft[1]
-        draw.text(topLeft, text, font=font, fill=WHITE)
-        text = "%d fps" % FPS
-        w,h=font.getsize(text)
-        topLeft = scaler.xy((150, 10))
-        topLeft = topLeft[0] - w, topLeft[1]
-        draw.text(topLeft, text, font=font, fill=WHITE)
-
+        draw.text(topLeft, text, font=font, fill=TITLE_COLOUR)
+        
         # draw an outer ring segment indicating the time period covered by the current frame
         topLeft = scaler.xy((105, 20))
         bottomRight = scaler.xy((155, 70))
         angle1 = 360 * (frameNum % FPS) / FPS
         angle2 = 360 * ((frameNum % FPS) + 1) / FPS
-        draw.pieslice(topLeft + bottomRight, start=270+angle1, end=270+angle2, outline=None, fill=WHITE)
+        draw.pieslice(topLeft + bottomRight, start=270+angle1, end=270+angle2, outline=None, fill=GFX_COLOUR)
 
         # hollow it out to make the circle into a ring
         topLeft = scaler.xy((108, 23))
         bottomRight = scaler.xy((152, 67))
-        draw.ellipse(topLeft + bottomRight, outline=None, fill=BLACK)
+        draw.ellipse(topLeft + bottomRight, outline=None, fill=BG_COLOUR)
         
 
         # draw frame num ring
@@ -288,20 +295,20 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, numFrames, FPS, 
         bottomRight = scaler.xy((150, 65))
         angle = 360 * (frameNum % FPS) / FPS
         if (frameNum / FPS) % 2 == 0:  # if this is an even second (0-0.9, 2-2.9, 4-4.9 etc)
-            draw.pieslice(topLeft + bottomRight, start=270, end=270+angle, outline=None, fill=WHITE)
+            draw.pieslice(topLeft + bottomRight, start=270, end=270+angle, outline=None, fill=GFX_COLOUR)
         else:
-            draw.pieslice(topLeft + bottomRight, start=270+angle, end=270+360, outline=None, fill=WHITE)
+            draw.pieslice(topLeft + bottomRight, start=270+angle, end=270+360, outline=None, fill=GFX_COLOUR)
 
         # hollow it out to make the circle into a ring
         topLeft = scaler.xy((113, 28))
         bottomRight = scaler.xy((147, 62))
-        draw.ellipse(topLeft + bottomRight, outline=None, fill=BLACK)
+        draw.ellipse(topLeft + bottomRight, outline=None, fill=BG_COLOUR)
 
         # draw progress pie
         topLeft = scaler.xy((115, 30))
         bottomRight = scaler.xy((145, 60))
         angle = 360.0*frameNum/numFrames
-        precise_filled_pieslice(draw, topLeft + bottomRight, start=270, end=270+angle, outline=None, fill=WHITE)
+        precise_filled_pieslice(draw, topLeft + bottomRight, start=270, end=270+angle, outline=None, fill=GFX_COLOUR)
 
         # draw pulse train at the bottom
         LIM=FPS
@@ -317,19 +324,19 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, numFrames, FPS, 
             
             seqIndex = offset + frameNum
             if seqIndex >= 0 and seqIndex < numFrames:
-                colour = flashCols[seqIndex]
+                colour = flashColsPipTrain[seqIndex]
                 draw.rectangle(topLeft + bottomRight, outline=None, fill = colour)
             
             if offset == 0:
                 # draw blob above
                 topLeft     = scaler.xy(( left, 75 ))                
                 bottomRight = scaler.xy(( right, 80 ))            
-                draw.rectangle(topLeft + bottomRight, outline=None, fill = WHITE)
+                draw.rectangle(topLeft + bottomRight, outline=None, fill = GFX_COLOUR)
                 
                 # and below
                 topLeft     = scaler.xy(( left, 85 ))          
                 bottomRight = scaler.xy(( right, 90 ))           
-                draw.rectangle(topLeft + bottomRight, outline=None, fill = WHITE)
+                draw.rectangle(topLeft + bottomRight, outline=None, fill = GFX_COLOUR)
 
         # shrink the image using high quality downsampling
         try:
