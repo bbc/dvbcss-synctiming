@@ -32,6 +32,7 @@ import re
 import sys
 import argparse
 import json
+import arduino
 
 import dvbcss.util
 
@@ -51,35 +52,36 @@ def ToleranceOrNone(value):
 class BaseCmdLineParser(object):
     """\
     Usage:
-    
+
     1. initialise
     2. call setupArguments()
     3. call parseArguments()
-    
+
     Parsed arguments will be in the `args` attribute
-    
+
     Subclass to add more arguments:
-    
+
       * initialisation puts an argparse.ArgumentParser() into self.parser
-    
+
       * override setupArguments() to add more arguments - before and/or after
         calling the superclass implementation of setupArguments() to determine
         the order.
-        
+
       * override parseArguments() to add additional parsing steps. Call the
         superclass implementaiton of parseArguments() first.
     """
     def __init__(self, desc):
         super(BaseCmdLineParser,self).__init__()
         self.parser = argparse.ArgumentParser(description=desc)
-        
+
         # setup some defaults
         self.PPM=500
-        #self.MEASURE_SECS = 15.0
+        # if no time specified, we'll calculate time based on number of pins
+        self.MEASURE_SECS = -1
         self.TOLERANCE = None
 
-        
-        
+
+
     def setupArguments(self):
         """\
         Setup the arguments used by the command line parser.
@@ -90,7 +92,7 @@ class BaseCmdLineParser(object):
         self.parser.add_argument("unitsPerTick", type=int, help="The denominator for the timeline tickrate (e.g. 1 for most timelines, such as PTS).")
         self.parser.add_argument("unitsPerSec", type=int, help="The numerator for the timeline tickrate (e.g. 90000 for PTS).")
         self.parser.add_argument("videoStartTicks", type=int, help="The timeline tick value corresponding to when the first frame of the test video sequence is expected to be shown.")
-        #self.parser.add_argument("--measureSecs",   dest="measureSecs", type=float, nargs=1, help="Duration of measurement period (default=%4.2f)" % MEASURE_SECS, default=[MEASURE_SECS])
+        self.parser.add_argument("--measureSecs",   dest="measureSecs", type=int, nargs=1, help="Duration of measurement period (default is max time possible given number of pins to sample", default=[self.MEASURE_SECS])
         self.parser.add_argument("--light0",   dest="light0_metadatafile", type=str, nargs=1, help="Measure light sensor input 0 and compare to expected flash timings in the named JSON metadata file.")
         self.parser.add_argument("--light1",   dest="light1_metadatafile", type=str, nargs=1, help="Measure light sensor input 1 and compare to expected flash timings in the named JSON metadata file.")
         self.parser.add_argument("--audio0",   dest="audio0_metadatafile", type=str, nargs=1, help="Measure audio input 0 and compare to expected beep timings in the named JSON metadata file.")
@@ -106,12 +108,12 @@ class BaseCmdLineParser(object):
         Parse and process arguments.
         :param args: The arguments to process as a list of strings. If not provided, defaults to processing sys.argv
         """
-        
+
         if args is None:
             self.args = self.parser.parse_args()
         else:
             self.args = self.parser.parse_args(args)
-            
+
 
         self.args.timelineClockFrequency = float(self.args.unitsPerSec) / self.args.unitsPerTick
 
@@ -131,7 +133,11 @@ class BaseCmdLineParser(object):
           sys.stderr.write("\nAborting. No light sensor or audio inputs have been specified.\n\n")
           sys.exit(1)
 
-        
+        # see if the requested time for measuring can be accomodated by the system
+        self.measurerTime = arduino.checkCaptureTimeAchievable(self.args.measureSecs[0], len(self.pinsToMeasure))
+        if self.measurerTime < 0:
+            sys.stderr.write("\nAborting.  The combination of measured time and pins to measure exceeds the measurement system's capabilities.\n\n")
+            sys.exit(1)
 
 def _loadExpectedTimeMetadata(pinMetadataFilenames):
     """\
@@ -172,7 +178,6 @@ def _loadExpectedTimeMetadata(pinMetadataFilenames):
 
 
 
-
 class TVTesterCmdLineParser(BaseCmdLineParser):
 
     def __init__(self):
@@ -187,16 +192,16 @@ class TVTesterCmdLineParser(BaseCmdLineParser):
 
         desc = "Measures synchronisation timing for a TV using the DVB CSS protocols. Does this by pretending to be the CSA and using an external Arduino microcontroller to take measurements."
         super(TVTesterCmdLineParser,self).__init__(desc)
-        
+
 
 
     def setupArguments(self):
-        # add argument to beginning of list (called before superclass method)    
+        # add argument to beginning of list (called before superclass method)
         self.parser.add_argument("contentIdStem", type=str, help="The contentIdStem the measurement system will use when requesting a timeline from the TV, (e.g. \"\" will match all content IDs)")
-    
+
         # let the superclass add its arguments
         super(TVTesterCmdLineParser,self).setupArguments()
-        
+
         # add arguments to end of set of arguments (called after superclass method)
         self.parser.add_argument("tsUrl", action="store", type=dvbcss.util.wsUrl_str, nargs=1, help="ws:// URL of TV's CSS-TS end point")
         self.parser.add_argument("wcUrl", action="store", type=dvbcss.util.udpUrl_str, nargs=1, help="udp://<host>:<port> URL of TV's CSS-WC end point")
@@ -207,7 +212,7 @@ class TVTesterCmdLineParser(BaseCmdLineParser):
     def parseArguments(self, args=None):
         # let the superclass do the argument parsing and parse the pin data
         super(TVTesterCmdLineParser,self).parseArguments(args)
-        
+
         self.wcBind = (self.args.wcBindAddr, self.args.wcBindPort)
 
 
@@ -231,8 +236,7 @@ class TVTesterCmdLineParser(BaseCmdLineParser):
         print
         print "   Assuming TV will be at start of video when timeline at : %d ticks" % (self.args.videoStartTicks)
         print
-        #print "   When go is pressed, will begin measuring immediately for %f seconds" % self.args.measureSecs[0]
-        print "   When go is pressed, will begin measuring immediately."
+        print "   When go is pressed, will begin measuring immediately for %d seconds" % self.measurerTime
         print
         if self.args.toleranceSecs[0] is not None:
             print "   Will report if TV is accurate within a tolerance of : %f milliseconds" % (self.args.toleranceSecs[0]*1000.0)
@@ -260,16 +264,16 @@ class CsaTesterCmdLineParser(BaseCmdLineParser):
 
         desc = "Measures synchronisation timing for a Companion Screen using the DVB CSS protocols. Does this by pretending to be the TV Device and using an external Arduino microcontroller to take measurements."
         super(CsaTesterCmdLineParser,self).__init__(desc)
-        
-        
+
+
     def setupArguments(self):
 
-        # add argument to beginning of list (called before superclass method)    
+        # add argument to beginning of list (called before superclass method)
         self.parser.add_argument("contentId", type=str, help="The contentId the measurement system will pretend to be playing (e.g. \"urn:github.com/bbc/dvbcss-synctiming:sync-timing-test-sequence\")")
-    
+
         # let the superclass add its arguments
         super(CsaTesterCmdLineParser,self).setupArguments()
-        
+
         # add arguments to end of set of arguments (called after superclass method)
         self.parser.add_argument("--waitSecs",     dest="waitSecs",      type=float,                  nargs=1, help="Number of seconds to wait before beginning to measure after timeline is unpaused (default=%4.2f)" % self.WAIT_SECS, default=[self.WAIT_SECS])
         self.parser.add_argument("--addr",         dest="addr",          type=dvbcss.util.iphost_str, nargs=1, help="IP address or host name to bind to (default=\""+str(self.ADDR)+"\")",default=[self.ADDR])
@@ -281,7 +285,7 @@ class CsaTesterCmdLineParser(BaseCmdLineParser):
         # let the superclass do the argument parsing and parse the pin data
         super(CsaTesterCmdLineParser,self).parseArguments(args)
 
-        
+
 
     def printTestSetup(self, ciiUrl, wcUrl, tsUrl):
         """\
@@ -306,8 +310,7 @@ class CsaTesterCmdLineParser(BaseCmdLineParser):
         print "   Assuming CSA will be at start of video when timeline at : %d ticks" % (self.args.videoStartTicks)
         print
         print "   When go is pressed, will wait for            : %f seconds" % self.args.waitSecs[0]
-        #print "   ... then unpause the timeline and measure for: %f seconds" % self.args.measureSecs[0]
-        print "   ... then unpause the timeline and measure"
+        print "   ... then unpause the timeline and measure for: %d seconds" % self.measurerTime
         print
         if self.args.toleranceSecs[0] is not None:
             print "   Will report if CSA is accurate within a tolerance of : %f milliseconds" % (self.args.toleranceSecs[0]*1000.0)

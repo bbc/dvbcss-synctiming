@@ -125,15 +125,14 @@ void prepareToCapture();
 
 void setup() {
   analogReadResolution(8);
+  /* assume we need all 90 KB, but we may use less if the user
+   * reduces the capture time.  This handles 45 seconds on 1 pin,
+   * down to 11.25 seconds on all 4 pins
+   */
   rawData = (unsigned char*)malloc(NINETY_KB);
   doinit();
   SerialUSB.begin(2304200);
   pinMode(LEDPIN, OUTPUT);
-  if (rawData == NULL) {
-      flashLed(5,800);
-  } else {
-  	flashLed(5, 300);
-  }
 }
 
 
@@ -147,9 +146,19 @@ void doinit() {
     }
 }
 
+/**
+ * wait for next byte of preparae to capture command
+ * and return it
+**/
+int getCaptureTime() {
+  while (!SerialUSB.available());
+  return SerialUSB.read();
+}
+
 void loop() {
   int idx;
   int rcvTime;
+  int nSecs;
     while (1) {
       if (SerialUSB.available()) {
         /* respond to any command immediately with a local time measurement */
@@ -165,7 +174,8 @@ void loop() {
             enable[idx] = 1;
             break;
         case '4':
-            prepareToCapture();
+            nSecs = getCaptureTime();
+            prepareToCapture(nSecs);
             break;      
         case 'S':
             capture();
@@ -198,29 +208,54 @@ void flashLed(int n, int delayMs) {
  * blocks will be created by the capture, based on the number
  * of ports chosen for sampling by the client, and initialise
  * the static block of memory with high,low value pairs
+ * @param nSeconds number of seconds to collect data over (must be greater than 0)
+ * the user of this arduino code should have checked that 
+ * nSeconds * 1000 *  nActivePorts *  BLKSIZE_PER_PIN <= 90 * 1024.
  */
-void prepareToCapture() {
+void prepareToCapture(int nSeconds) {
     nActivePorts = setupActivePortsMapping();
     if (nActivePorts == 0 || nActivePorts > N_INPUTS) {
-        doinit();
-        writeInt(0);
-        writeInt(0);
-        return;
+        flashLed(5, 300);
+      	reportFailure();
+       	return;
     }
-    /* we need BLKSIZE_PER_PIN bytes of data per active analogue pin per millisecond
-     * and we are going to limit ourselves to 90KB total
-     */
-    nMilliBlks = NINETY_KB / (nActivePorts * BLKSIZE_PER_PIN);
+    
+    if (nSeconds <= 0) {
+        flashLed(7 - nSeconds, 500);
+      	reportFailure();
+       	return;
+    }
+
+    nMilliBlks = nSeconds * 1000;
+    if (nMilliBlks * nActivePorts *  BLKSIZE_PER_PIN > NINETY_KB) {
+        flashLed(15, 300);
+ 	reportFailure();
+	return;
+    }
+
     initLoHi();
     writeInt(nActivePorts);
     writeInt(nMilliBlks);
-  }
+}
+
+
+/**
+ * there's a problem with requested set up, so reinitialise
+ * and send back failure
+**/
+void reportFailure() {
+	doinit();
+	writeInt(0);
+	writeInt(0);
+}
+
+
 
 /**
  * Sample the ports chosen by client, via the '0' to '3' commands.
  * For each such port, determine high and low values over continuous sampling during 1 millisec,
  * and store this discovered pair of results.  This represents one data sample. Do this over a
- * period of time that will keep us within 90 KB of RAM consumption (Arduino Due has 96 KB available) 
+ * period of time requested by user that will keep us within 90 KB of RAM consumption (Arduino Due has 96 KB available) 
 **/
 void capture() {
 

@@ -193,7 +193,8 @@ that the CSA emits.*
                                    --addr 192.168.1.5                     \
                                    --light0 metadata.json                 \
                                    --audio0 metadata.json                 \
-                                   --toleranceTest 8.0
+                                   --toleranceTest 8.0                    \
+                                   --measureSecs 15
    
     This instructs the measurement system to:
 
@@ -222,6 +223,11 @@ that the CSA emits.*
      * Report on whether the timing was accurate enough to be within a
        tolerance of +/- 8 milliseconds (after error bounds of measurement are
        taken into account)
+   
+     * Measure for only 15 seconds. If this option is omitted, the arduino
+       measures until its memory buffer is full. See
+       [this table](#measurement-period-duration). This number must be an
+       integer number of seconds.
    
     (For more information on the command line arguments, use the `--help`
     option) 
@@ -267,7 +273,8 @@ sees coming from the TV.*
                                         udp://192.168.1.23:6677            \
                                         --light0 metadata.json             \
                                         --audio0 metadata.json             \
-                                        --toleranceTest 23.0
+                                        --toleranceTest 23.0		   \
+                                        --measureSecs 15
    
     This instructs the measurement system to:
 
@@ -295,6 +302,11 @@ sees coming from the TV.*
      * Report on whether the timing was accurate enough to be within a
        tolerance of +/- 23 milliseconds (after error bounds of measurement
        are taken into account)
+
+     * Measure for only 15 seconds. If this option is omitted, the arduino
+       measures until its memory buffer is full. See
+       [this table](#measurement-period-duration). This number must be an
+       integer number of seconds.
    
     (For more information on the command line arguments, use the `--help`
     option) 
@@ -307,6 +319,28 @@ how good a match it found between the pattern of flashes and beeps it
 expected and those that it observed. It also reports how far ahead or behind
 the CSA appeared to be.
 
+
+## Measurement period duration
+
+The system can measure until the 90 KByte buffer on the arduino is full.
+For each input pin being measured, 2000 bytes of data are used every second.
+The table below shows the maximum measurement periods allowed:
+
+Number of light or sound input pins being measured | Maximum measurement duration possible
+-------------------------------------------------- | -------------------------------------
+1 | 45 seconds
+2 | 22 seconds
+3 | 15 seconds
+4 | 11 seconds
+
+**Remember** that length of the measurement period in seconds must be equal
+to or greater than the sequence bit-length of the test video sequence.
+For example: a measurement period of at least 7 seconds must be used for
+a 7 bit sequence.
+
+If the measurement period is too short then the system will sometimes fail
+to correctly determine the synchronisation accuracy and will produce spurious
+erroneous results.
 
 ## Assumptions
 

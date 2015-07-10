@@ -243,7 +243,8 @@ if __name__ == "__main__":
                             syncTimelineClock, \
                             syncClockTickRate, \
                             wcPrecisionNanos, \
-                            acPrecisionNanos)
+                            acPrecisionNanos, \
+                            cmdParser.measurerTime)
 
         measurer.setSyncTimeLinelockController(syncTimelineClockController)
 
