@@ -73,13 +73,17 @@ For example:
         "durationSecs": 7,
         "patternWindowLength": 3,
         "fps": 25,
-        "size": [320, 180]
+        "size": [320, 180],
+        "approxFlashDurationSecs": 0.12,
+        "approxBeepDurationSecs": 0.12
     }
 
 The list of timings is essential input to any process that wishes to check
 whether a companion screen is correctly synchronised to Control Timestamps it
 receives; or a TV Device is sending out Control Timestamps that accurately
 match what it is actually doing.
+
+The information on the approximate durations of the flashes and beeps is used to tune the flash/beep detection algorithms.
 
 The formats outputted are:
 

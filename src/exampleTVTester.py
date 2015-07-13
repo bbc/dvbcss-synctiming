@@ -238,6 +238,7 @@ if __name__ == "__main__":
         measurer = Measurer("client", \
                             cmdParser.pinsToMeasure, \
                             cmdParser.pinExpectedTimes, \
+                            cmdParser.pinEventDurations, \
                             cmdParser.args.videoStartTicks, \
                             wallClock, \
                             syncTimelineClock, \

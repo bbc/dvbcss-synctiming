@@ -524,7 +524,7 @@ def minMaxDataToEnvelopeData(loSampleData, hiSampleData):
     return map(lambda lo, hi: hi-lo, loSampleData, hiSampleData)
 
 
-def detectFlashes(loSampleData, hiSampleData, holdCount=4):
+def detectFlashes(loSampleData, hiSampleData, holdCount):
     """\
     Takes light sensor sample data and returns the indices of the centre times of
     light flashes. Calibrates the detection process against the data itself.
@@ -538,7 +538,7 @@ def detectFlashes(loSampleData, hiSampleData, holdCount=4):
     return detectPulses(hiSampleData, risingThreshold, fallingThreshold, holdCount)
 
 
-def detectBeeps(loSampleData, hiSampleData, holdCount=1):
+def detectBeeps(loSampleData, hiSampleData, holdCount):
     """\
     Takes audio sample data and returns the indices of the centre times of
     beeps. Calibrates the detection process against the data itself.
@@ -633,7 +633,7 @@ class BeepFlashDetector(object):
     
 
 
-    def samplesToFlashTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos):
+    def samplesToFlashTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, flashDurationSecs):
         """\
         Takes sample data recorded by the arduino light sensor and detects flashes from it,
         translating that to times on the synchronisation timeline (including error bounds)
@@ -643,17 +643,24 @@ class BeepFlashDetector(object):
         :param hiSampleData: lost of sample values corresponding to the maximum values seen during each sample period.
         :param acStartNanos: the Arduino clock time at which the first sampling period began (in nanoseconds)
         :param acEndNanos: the Arduino clock time at which the last sampling period ended (in nanoseconds)
+        :param eventDurationSecs: the approximate duration (in seconds) of a flash
 
         :returns: a list of tuples. Each tuple represents a detected flash.
         The tuple contains (time, errorBound) representing the time of the
         middle of the flash, with an uncertainty of +/- errorBound. 
         
         """
+        # calculate a hold time for the flash detection process based on the hint about flash duration
+        # set it quite long to cope with backlight flicker issues
+        holdTime = flashDurationSecs * 0.5    # half of the flash duration
+        holdCount = int(holdTime * 1000)     # one sample = 1 millisecond
+        
+        # run the detection
         detectFunc = detectFlashes
-        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc)
+        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, holdCount)
 
         
-    def samplesToBeepTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos):
+    def samplesToBeepTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, beepDurationSecs):
         """\
         Takes sample data recorded by the arduino audio input and detects beeps from it,
         translating that to times on the synchronisation timeline (including error bounds)
@@ -669,14 +676,20 @@ class BeepFlashDetector(object):
         middle of the beep, with an uncertainty of +/- errorBound. 
         
         """
+        # calculate a hold time for the flash detection process based on the hint about beep duration
+        # set it quite long to cope with badly shaped waveforms
+        holdTime = beepDurationSecs * 0.5    # half of the beep duration
+        holdCount = int(holdTime * 1000)     # one sample = 1 millisecond
+        
+        # run the detection
         detectFunc = detectBeeps
-        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc)
+        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, holdCount)
 
         
-    def convertSamplesToDetectionTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc):
+    def convertSamplesToDetectionTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, holdCount):
         
         # determine indexes in the sample data corresponding to centre time of each pulse
-        pulseIndices = detectFunc(loSampleData, hiSampleData)
+        pulseIndices = detectFunc(loSampleData, hiSampleData, holdCount)
         
         # generate list of timings corresponding to start time of each sample
         stTimesAndErrors = timesForSamples(
