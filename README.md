@@ -91,22 +91,26 @@ snapshot](https://github.com/BBC/dvbcss-synctiming/releases).
 On Mac OS X and Linux you may need to run one or more of the following
 commands as root.
 
-We recommend using [pip](https://pip.pypa.io/en/latest/installing.html) to
-install pyserial and PIL (aka "pillow") from the Python Package Index
-[PyPI](https://pypi.python.org/pypi):
+1. We recommend using [pip](https://pip.pypa.io/en/latest/installing.html) to
+   install pyserial and PIL (aka "pillow") from the Python Package Index
+   [PyPI](https://pypi.python.org/pypi):
+      
+        $ pip install pyserial 
+        $ pip install pillow
 
-    $ pip install pyserial 
-    $ pip install pillow
+2. Download and install [pydvbcss library](https://github.com/BBC/pydvbcss) from
+   GitHub (it is not yet available through PIP). This provides the
+   implementation of the DVB synchronisation protocols used by the PC software.
+      
+        $ git clone https://github.com/BBC/pydvbcss.git
+        $ pip install cherrypy
+        $ pip install ws4py
+        $ cd pydvbcss
+        $ python setup.py install
 
-Download and install [pydvbcss library](https://github.com/BBC/pydvbcss) from
-GitHub (it is not yet available through PIP). This provides the
-implementation of the DVB synchronisation protocols used by the PC software.
-
-    $ git clone https://github.com/BBC/pydvbcss.git
-    $ pip install cherrypy
-    $ pip install ws4py
-    $ cd pydvbcss
-    $ python setup.py install
+3. Install the *Arduino SDK* to get the USB drivers for communicating with
+   the Arduino (even if you have already programmed the device (see below).
+   You need to [download version 1.6 or later](https://www.arduino.cc/en/Main/Software).
 
 ### 2. Create a video test sequence
 
@@ -138,7 +142,7 @@ not recommended.
 3. Make sure the screen brightness is reasonable and audio output is un-muted
 and at a reasonable volume.
 
-3. Connect the Arduino's "native" USB port to a USB port on the PC.
+4. Connect the Arduino's "native" USB port to a USB port on the PC.
 
 
 
