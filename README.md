@@ -75,15 +75,21 @@ IDE has built in support for uploading the code to the Arduino. The IDE also
 runs on Windows, Mac and Linux.
 
 
-### 1. Download and install
+### 1. Download this clode plus dependencies
+
+**Clone the master branch of this code:**
+
+    $ git clone https://github.com/bbc/dvbcss-synctiming.git
 
 The [master branch](https://github.com/BBC/dvbcss-synctiming/tree/master) is the
 latest state of the code, including any recent bug fixes and new features. It
 will be kept stable (working). Alternatively you can download a [release
 snapshot](https://github.com/BBC/dvbcss-synctiming/releases).
 
-On Mac OS X and Linux you may need to run one or more of the commands as
-root.
+**Now lets also get the dependencies...**
+
+On Mac OS X and Linux you may need to run one or more of the following
+commands as root.
 
 We recommend using [pip](https://pip.pypa.io/en/latest/installing.html) to
 install pyserial and PIL (aka "pillow") from the Python Package Index
