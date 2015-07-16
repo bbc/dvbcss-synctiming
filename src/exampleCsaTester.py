@@ -204,7 +204,7 @@ def setInitialCII(ciiServer, contentId, timelineSelector, unitsPerTick, unitsPer
     ciiServer.cii.protocolVersion = "1.1"
     ciiServer.cii.contentId = contentId # "urn:uk.co.bbc.rd:companion-screen:test-calibration-stream"
     ciiServer.cii.contentIdStatus = "final"
-    ciiServer.cii.presentationStatus = "okay"
+    ciiServer.cii.presentationStatus = ["okay"]
 
     t1 = TimelineOption(timelineSelector=timelineSelector, unitsPerTick=unitsPerTick, unitsPerSecond=unitsPerSecond)
     ciiServer.cii.timelines = [t1]
