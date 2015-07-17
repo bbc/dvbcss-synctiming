@@ -458,7 +458,7 @@ def calcBeepThresholds(envelopeSampleData):
     fallingThreshold = (lo*2 + hi) / 3.0
     return risingThreshold, fallingThreshold
 
-def detectPulses(hiSampleData, risingThreshold, fallingThreshold, holdCount):
+def detectPulses(hiSampleData, risingThreshold, fallingThreshold, minSampleDuration, minPulseDuration, holdCount):
     """\
     Pulse detection state machine. Returns a list of indices into the sample
     data provided for the centre points of the detected pulses.
@@ -466,6 +466,8 @@ def detectPulses(hiSampleData, risingThreshold, fallingThreshold, holdCount):
     :param sampleData: list of sample values
     :param risingThreshold: threshold for low to high transition
     :param fallingTreshold: threshold for high to low transition
+    :param minSampleDuration: the minimum number of samples of the same type required for the state change to be considered valid
+    :param minPulseDuration: the minimum number of samples a pulse must last for
     :param holdCount: number of samples to hold a high state for
     
     If first data above the rising threshold occurs at index i where
@@ -474,41 +476,60 @@ def detectPulses(hiSampleData, risingThreshold, fallingThreshold, holdCount):
     
     :returns: list of indices of the centre times of each pulse that is detected. Values are all floating point and may include 'halfway' indices, e.g. 14.5
     """
+    
+    if minSampleDuration > minPulseDuration:
+        raise RuntimeError("minSampleDuration must be <= minPulseDuration.")
+
     pulseIntervals = []
     
     LO = 0
     HI = 1
     
     state = HI
+    verifiedState = HI
     ignoreFirstPulse = True
     latestHi = -1
+    hiTransitionIndex = -minSampleDuration
+    loTransitionIndex = -minSampleDuration
 
     for i in range(0, len(hiSampleData)):
         v = hiSampleData[i]
-        if state == LO:
+        if verifiedState == LO:
             if v >= risingThreshold:
-                state = HI
-                hiTransitionIndex = i
-                latestHi = i
-                
-        elif state == HI:
+                if state == LO:
+                    state = HI
+                    hiTransitionIndex = i
+                if i - hiTransitionIndex >= minSampleDuration:
+                    verifiedState = HI
+                    latestHi = i
+            else:
+                state = LO
+        elif verifiedState == HI:
             if v > fallingThreshold:
                 latestHi = i
+                state = HI
             else:
                 if v <= fallingThreshold:
-                    if i - latestHi > holdCount:
+                    if state == HI:
                         state = LO
-                        if not ignoreFirstPulse:
-                            pulseStart = hiTransitionIndex
-                            pulseEnd   = i-(holdCount+1)
-                            pulseIntervals.append((pulseStart, pulseEnd))
-                        ignoreFirstPulse=False
+                        loTransitionIndex = i
+                    if i - loTransitionIndex >= minSampleDuration:
+                        if i - latestHi > holdCount:
+                            verifiedState = LO
+                            if not ignoreFirstPulse:
+                                pulseStart    = hiTransitionIndex
+                                pulseEnd      = latestHi+1
+                                pulseDuration = pulseEnd - pulseStart
+                                if pulseDuration >= minPulseDuration:
+                                    pulseIntervals.append((pulseStart, pulseEnd))
+                            ignoreFirstPulse=False
                         
         else:
             raise RuntimeError("Unexpected state reached in pulse detector.")
 
     # list currently contains intervals, convert to indices of the centre point (which might be at a halfway)
-    pulseIndices = map(lambda (start,end) : (start+end)/2.0, pulseIntervals)
+    # the end values are the positions where it went back to low, therefore the last high is end-1
+    pulseIndices = map(lambda (start,end) : (start+(end-1))/2.0, pulseIntervals)
     return pulseIndices
 
 
@@ -524,33 +545,37 @@ def minMaxDataToEnvelopeData(loSampleData, hiSampleData):
     return map(lambda lo, hi: hi-lo, loSampleData, hiSampleData)
 
 
-def detectFlashes(loSampleData, hiSampleData, holdCount):
+def detectFlashes(loSampleData, hiSampleData, minSampleDuration, minFlashDuration, holdCount):
     """\
     Takes light sensor sample data and returns the indices of the centre times of
     light flashes. Calibrates the detection process against the data itself.
     
     :param loSampleData: list of sample values, where each value is the lowest seen during that sampling period
     :param loSampleData: list of sample values, where each value is the highest seen during that sampling period
-    :param holdCount: optional override of the high-value hold duration (in units of a whole number of sampling periods)
+    :param minSampleDuration: the minimum number of samples of the same type required for the state change to be considered valid
+    :param minPulseDuration: the minimum number of samples a flash must last for
+    :param holdCount: the high-value hold duration (in units of a whole number of sampling periods)
     :returns: list of sample indices corresponding to the centre of each detected flash. Values are floating point and may be midway between indices.
     """
     risingThreshold, fallingThreshold = calcFlashThresholds(loSampleData, hiSampleData)
-    return detectPulses(hiSampleData, risingThreshold, fallingThreshold, holdCount)
+    return detectPulses(hiSampleData, risingThreshold, fallingThreshold, minSampleDuration, minFlashDuration, holdCount)
 
 
-def detectBeeps(loSampleData, hiSampleData, holdCount):
+def detectBeeps(loSampleData, hiSampleData, minSampleDuration, minBeepDuration, holdCount):
     """\
     Takes audio sample data and returns the indices of the centre times of
     beeps. Calibrates the detection process against the data itself.
     
     :param loSampleData: list of sample values, where each value is the lowest seen during that sampling period
     :param loSampleData: list of sample values, where each value is the highest seen during that sampling period
-    :param holdCount: optional override of the high-value hold duration (in units of a whole number of sampling periods)
+    :param minSampleDuration: the minimum number of samples of the same type required for the state change to be considered valid
+    :param minBeepDuration: the minimum number of samples a beep must last for
+    :param holdCount: the high-value hold duration (in units of a whole number of sampling periods)
     :returns: list of sample indices corresponding to the centre of each detected beep. Values are floating point and may be midway between indices.
     """
     envelopeSampleData = minMaxDataToEnvelopeData(loSampleData, hiSampleData)
     risingThreshold, fallingThreshold = calcBeepThresholds(envelopeSampleData)
-    return detectPulses(envelopeSampleData, risingThreshold, fallingThreshold, holdCount)
+    return detectPulses(envelopeSampleData, risingThreshold, fallingThreshold, minSampleDuration, minBeepDuration, holdCount)
 
 
 # ---------------------------------------------------------------------------
@@ -643,7 +668,7 @@ class BeepFlashDetector(object):
         :param hiSampleData: lost of sample values corresponding to the maximum values seen during each sample period.
         :param acStartNanos: the Arduino clock time at which the first sampling period began (in nanoseconds)
         :param acEndNanos: the Arduino clock time at which the last sampling period ended (in nanoseconds)
-        :param eventDurationSecs: the approximate duration (in seconds) of a flash
+        :param flashDurationSecs: the approximate duration (in seconds) of a flash
 
         :returns: a list of tuples. Each tuple represents a detected flash.
         The tuple contains (time, errorBound) representing the time of the
@@ -652,12 +677,14 @@ class BeepFlashDetector(object):
         """
         # calculate a hold time for the flash detection process based on the hint about flash duration
         # set it quite long to cope with backlight flicker issues
-        holdTime = flashDurationSecs * 0.5    # half of the flash duration
+        holdTime = flashDurationSecs * 0.5   # half of the flash duration
         holdCount = int(holdTime * 1000)     # one sample = 1 millisecond
+        minFlashDuration = int(holdCount/2)
+        minSampleDuration = min(5, minBeepDuration)
         
         # run the detection
         detectFunc = detectFlashes
-        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, holdCount)
+        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, minSampleDuration, minFlashDuration, holdCount)
 
         
     def samplesToBeepTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, beepDurationSecs):
@@ -670,6 +697,7 @@ class BeepFlashDetector(object):
         :param hiSampleData: lost of sample values corresponding to the maximum values seen during each sample period.
         :param acStartNanos: the Arduino clock time at which the first sampling period began (in nanoseconds)
         :param acEndNanos: the Arduino clock time at which the last sampling period ended (in nanoseconds)
+        :param beepDurationSecs: the approximate duration (in seconds) of a beep
 
         :returns: a list of tuples. Each tuple represents a detected beep.
         The tuple contains (time, errorBound) representing the time of the
@@ -678,18 +706,21 @@ class BeepFlashDetector(object):
         """
         # calculate a hold time for the flash detection process based on the hint about beep duration
         # set it quite long to cope with badly shaped waveforms
-        holdTime = beepDurationSecs * 0.5    # half of the beep duration
-        holdCount = int(holdTime * 1000)     # one sample = 1 millisecond
-        
+        holdTime = beepDurationSecs  * 0.6  # proportion of the beep duration
+        holdCount = int(holdTime * 1000)    # one sample = 1 millisecond
+        minBeepDurationSecs = beepDurationSecs * 0.6
+        minBeepDuration = int(minBeepDurationSecs * 1000)
+        minSampleDuration = min(5, minBeepDuration)
+
         # run the detection
         detectFunc = detectBeeps
-        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, holdCount)
+        return self.convertSamplesToDetectionTimings(loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, minSampleDuration, minBeepDuration, holdCount)
 
         
-    def convertSamplesToDetectionTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, holdCount):
+    def convertSamplesToDetectionTimings(self, loSampleData, hiSampleData, acStartNanos, acEndNanos, detectFunc, minSampleDuration, minPulseDuration, holdCount):
         
         # determine indexes in the sample data corresponding to centre time of each pulse
-        pulseIndices = detectFunc(loSampleData, hiSampleData, holdCount)
+        pulseIndices = detectFunc(loSampleData, hiSampleData, minSampleDuration, minPulseDuration, holdCount)
         
         # generate list of timings corresponding to start time of each sample
         stTimesAndErrors = timesForSamples(

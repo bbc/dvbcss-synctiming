@@ -22,7 +22,8 @@ Unit-tests for code that does statistics output
 import unittest
 
 import sys
-sys.path.append("../src")
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../src")
 
 
 from stats import determineWithinTolerance
