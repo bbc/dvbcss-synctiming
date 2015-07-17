@@ -680,7 +680,7 @@ class BeepFlashDetector(object):
         holdTime = flashDurationSecs * 0.5   # half of the flash duration
         holdCount = int(holdTime * 1000)     # one sample = 1 millisecond
         minFlashDuration = int(holdCount/2)
-        minSampleDuration = min(5, minBeepDuration)
+        minSampleDuration = 0
         
         # run the detection
         detectFunc = detectFlashes
@@ -710,7 +710,7 @@ class BeepFlashDetector(object):
         holdCount = int(holdTime * 1000)    # one sample = 1 millisecond
         minBeepDurationSecs = beepDurationSecs * 0.6
         minBeepDuration = int(minBeepDurationSecs * 1000)
-        minSampleDuration = min(5, minBeepDuration)
+        minSampleDuration = min(5, int(minBeepDuration/2))
 
         # run the detection
         detectFunc = detectBeeps
