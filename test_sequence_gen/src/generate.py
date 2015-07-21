@@ -206,20 +206,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--frame-filename", dest="FRAME_FILENAME_PATTERN", action="store", nargs=1,
         type=str,
-        default=[FRAME_FILENAME_PATTERN],
-        help="Filename pattern for writing PNG frames. Use printf style 'percent-d' syntax to include the frame number. Default=\"%s\"" % FRAME_FILENAME_PATTERN.replace("%","%%"))
+        default=[None],
+        help="Filename pattern for writing PNG frames. Use printf style 'percent-d' syntax to include the frame number. Frames will not be written if this argument is provided")
     
     parser.add_argument(
         "--wav-filename", dest="AUDIO_FILENAME", action="store", nargs=1,
         type=str,
-        default=[AUDIO_FILENAME],
-        help="Filename for writing the WAV file. Default=\"%s\"" % AUDIO_FILENAME)
+        default=[None],
+        help="Filename for writing the WAV file. Audio will not be generated if this argument is not provided.")
     
     parser.add_argument(
         "--metadata-filename", dest="METADATA_FILENAME", action="store", nargs=1,
         type=str,
-        default=[METADATA_FILENAME],
-        help="Filename for writing the JSON file containing metadata and beep/flash timings. Default=\"%s\"" % METADATA_FILENAME)
+        default=[None],
+        help="Filename for writing the JSON file containing metadata and beep/flash timings. Metadata will not be written if this argument is not provided")
 
     parser.add_argument(
         "--title", dest="TITLE_TEXT", action="store", nargs=1,
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     for filename, purpose in [ (frameFilenames,   "frame images"),
                                (audioFilename,    "WAV file"),
                                (metadataFilename, "metadata JSON file") ]:
-        if not os.path.isdir(os.path.dirname(filename)):
+        if filename is not None and not os.path.isdir(os.path.dirname(filename)):
             sys.stderr.write("\nCould not find output directory for "+purpose+".\nPlease check it exists and create it if necessary.\n\n")
             sys.exit(1)
 
@@ -285,9 +285,9 @@ if __name__ == "__main__":
     print "   Sequence duration:          %d seconds (%d frames)" % (sequenceDurationSecs, sequenceDurationSecs*fps)
     print "   Video frame dimensions:     %d x %d pixels" % pixelsSize
     print "   Audio sample rate:          %d Hz" % sampleRateHz
-    print "   Filename for PNG frames:    %s " % frameFilenames
-    print "   Filename for WAV audio:     %s " % audioFilename
-    print "   Filename for JSON metadata: %s " % metadataFilename
+    print "   Filename for PNG frames:    %s " % (frameFilenames if frameFilenames is not None else "<< will not be saved >>")
+    print "   Filename for WAV audio:     %s " % (audioFilename if audioFilename is not None else "<< will not be saved >>")
+    print "   Filename for JSON metadata: %s " % (metadataFilename if metadataFilename is not None else "<< will not be saved >>")
     print "   Text colour:                %d %d %d " % text_colour
     print "   Visual indicators colour:   %d %d %d " % gfx_colour
     print "   Background colour:          %d %d %d " % bg_colour
@@ -307,98 +307,108 @@ if __name__ == "__main__":
     amplitude = 32767*0.5
     idealBeepDurationSecs = idealBeepDurationFrames/fps
 
-    # obtain a generator that can yield a never ending stream of beep timings
-    eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
-    
-    # now we resolve that into an actual stream of sample data...
+    if audioFilename is not None:
+        # obtain a generator that can yield a never ending stream of beep timings
+        eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
+        
+        # now we resolve that into an actual stream of sample data...
 
-    # the genBeepSequence() generator converts the sequence of event times into
-    # start and end times for the beep
-    # corresponding to each event and also converts to audio sample data
+        # the genBeepSequence() generator converts the sequence of event times into
+        # start and end times for the beep
+        # corresponding to each event and also converts to audio sample data
 
-    # the middle of each beep corresponding to the time of the event
-    # choose beep duration carefully to match an exact number of cycles of the
-    # tone sine wave to make it really nice and clean and symmetrical
-    
-    print "Generating audio..."
-    seqIter = genBeepSequence(eventCentreTimesSecs, idealBeepDurationSecs, sequenceDurationSecs, sampleRateHz, toneHz, amplitude)
-    
-    print "Saving audio..."
-    saveAsWavFile(seqIter, audioFilename, sampleRateHz)
+        # the middle of each beep corresponding to the time of the event
+        # choose beep duration carefully to match an exact number of cycles of the
+        # tone sine wave to make it really nice and clean and symmetrical
+        
+        print "Generating audio..."
+        seqIter = genBeepSequence(eventCentreTimesSecs, idealBeepDurationSecs, sequenceDurationSecs, sampleRateHz, toneHz, amplitude)
+        
+        print "Saving audio..."
+        saveAsWavFile(seqIter, audioFilename, sampleRateHz)
+    else:
+        print "NOT generating audio (no filename provided)"
     
     # -----------------------------------------------------------------------
     
     # SECOND we'll do the video sequence
 
-    black=(0,0,0)
-    white=(255,255,255)
     idealFlashDurationSecs = flashNumDurationFrames/fps
 
-    # obtain a generator that can yield a never ending stream of flash timings
-    eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
+    if frameFilenames is not None:
+        black=(0,0,0)
+        white=(255,255,255)
 
-    # provide that as input to a new generator that yields a stream of
-    # pixel colours for the flash for each frame. black=no flash. white=flash
-    flashSequence = genFlashSequence(eventCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, fps, black, white)
-    
-    # do a second version for the pip train using the gfx and bg colors
-    eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
-    pipTrainSequence = genFlashSequence(eventCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, fps, bg_colour, gfx_colour)
+        # obtain a generator that can yield a never ending stream of flash timings
+        eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
 
-    flashSequence = list(flashSequence) # flatten so we can know the length
-    frameNum=0
-    
-    print "Generating video frames..."
-    numNumberSubstitutions = len(re.findall(r"%.?[0-9]*d", frameFilenames))
-    
-    # pass the flash sequence pixel colour generator to a new generator that
-    # will yield a sequence of image frames
-    
-    numFrames = len(flashSequence)
-    frames = genFrameImages(pixelsSize, flashSequence, pipTrainSequence, numFrames, fps, \
-        BG_COLOUR=bg_colour, GFX_COLOUR=gfx_colour, TEXT_COLOUR=text_colour, title=title_text, TITLE_COLOUR=title_colour )
-    n=0
-    for frame in frames:
-        print "    Generating and saving frame %d of %d" % (n, numFrames-1)    
-        filename = frameFilenames % tuple([n] * numNumberSubstitutions)
-        frame.save(filename, format="PNG")
-        n=n+1
+        # provide that as input to a new generator that yields a stream of
+        # pixel colours for the flash for each frame. black=no flash. white=flash
+        flashSequence = genFlashSequence(eventCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, fps, black, white)
+        
+        # do a second version for the pip train using the gfx and bg colors
+        eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
+        pipTrainSequence = genFlashSequence(eventCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, fps, bg_colour, gfx_colour)
+
+        flashSequence = list(flashSequence) # flatten so we can know the length
+        frameNum=0
+        
+        print "Generating video frames..."
+        numNumberSubstitutions = len(re.findall(r"%.?[0-9]*d", frameFilenames))
+        
+        # pass the flash sequence pixel colour generator to a new generator that
+        # will yield a sequence of image frames
+        
+        numFrames = len(flashSequence)
+        frames = genFrameImages(pixelsSize, flashSequence, pipTrainSequence, numFrames, fps, \
+            BG_COLOUR=bg_colour, GFX_COLOUR=gfx_colour, TEXT_COLOUR=text_colour, title=title_text, TITLE_COLOUR=title_colour )
+        n=0
+        for frame in frames:
+            print "    Generating and saving frame %d of %d" % (n, numFrames-1)    
+            filename = frameFilenames % tuple([n] * numNumberSubstitutions)
+            frame.save(filename, format="PNG")
+            n=n+1
+    else:
+        print "NOT generating video frames (no filename provided)"
     
     # -----------------------------------------------------------------------
     
     # THIRD we'll write out metadata
-    
-    print "Generating and writing metadata..."
-    
-    # obtain a generator that can yield a never ending stream of flash timings
-    eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
 
-    timings = []
-    for eventTime in eventCentreTimesSecs:
-    
-        # check if we've reached the end, and exit the loop if we have
-        if eventTime >= sequenceDurationSecs:
-            break
-        else:
-            timings.append(eventTime)
-    
-            
-    
-    # assemble the metadata into a structure and write out as JSON file
-    metadata = {
-        "size" : [ pixelsSize[0], pixelsSize[1] ],
-        "fps" : fps,
-        "durationSecs" : sequenceDurationSecs,
-        "patternWindowLength" : seqBitLen,
-        "eventCentreTimes" : timings,
-        "approxBeepDurationSecs" : idealBeepDurationSecs,
-        "approxFlashDurationSecs" : idealFlashDurationSecs,
-    }
+    if metadataFilename is not None:    
+        print "Generating and writing metadata..."
+        
+        # obtain a generator that can yield a never ending stream of flash timings
+        eventCentreTimesSecs = genEventCentreTimes(seqBitLen, fps)
 
-    jsonString = json.dumps(metadata)
-    f=open(metadataFilename, "wb")
-    f.write(jsonString)
-    f.close()
+        timings = []
+        for eventTime in eventCentreTimesSecs:
+        
+            # check if we've reached the end, and exit the loop if we have
+            if eventTime >= sequenceDurationSecs:
+                break
+            else:
+                timings.append(eventTime)
+        
+                
+        
+        # assemble the metadata into a structure and write out as JSON file
+        metadata = {
+            "size" : [ pixelsSize[0], pixelsSize[1] ],
+            "fps" : fps,
+            "durationSecs" : sequenceDurationSecs,
+            "patternWindowLength" : seqBitLen,
+            "eventCentreTimes" : timings,
+            "approxBeepDurationSecs" : idealBeepDurationSecs,
+            "approxFlashDurationSecs" : idealFlashDurationSecs,
+        }
+
+        jsonString = json.dumps(metadata)
+        f=open(metadataFilename, "wb")
+        f.write(jsonString)
+        f.close()
+    else:
+        print "NOT generating metadata file (no filename provided)"
     
     print "Done."
     print
