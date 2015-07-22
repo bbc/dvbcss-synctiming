@@ -137,14 +137,13 @@ class Test_detectPulses(unittest.TestCase):
 
         risingThreshold = 7
         fallingThreshold = 4
-        minSampleDuration = 0
         minPulseDuration = 0
         holdCount = 1
 
         #              IGNORE-              FIRST---                SECOND----------              IGNORE
         sampleData = [ 1, 8, 8, 0, 0, 0, 3, 8, 8, 7, 4, 1, 0, 1, 0, 7, 9, 1, 7, 9, 8, 3, 0, 0, 0, 8, 9 ]
         
-        result = detectPulses(sampleData, risingThreshold, fallingThreshold, minSampleDuration, minPulseDuration, holdCount)
+        result = detectPulses(sampleData, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [8.0, 17.5])
 
 
@@ -169,29 +168,27 @@ class Test_detectPulses(unittest.TestCase):
 
         risingThreshold = 6
         fallingThreshold = 3
-        minSampleDuration = 0
         minPulseDuration = 0
         holdCount = 0
 
-        result = detectPulses(envelope, risingThreshold, fallingThreshold, minSampleDuration, minPulseDuration, holdCount)
+        result = detectPulses(envelope, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [10.5, 18.0])
 
         holdCount = 1
-        result = detectPulses(envelope, risingThreshold, fallingThreshold, minSampleDuration, minPulseDuration, holdCount)
+        result = detectPulses(envelope, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [10.5, 18.0])
 
     def testNoisySamplesScenario(self):
 
         risingThreshold = 7
         fallingThreshold = 4
-        minSampleDuration = 1
-        minPulseDuration = 1
+        minPulseDuration = 2
         holdCount = 1
 
         #              IGNORE-              FIRST---     |noise|     SECOND----------              IGNORE
         sampleData = [ 1, 8, 8, 0, 0, 0, 3, 8, 8, 7, 4, 1, 10, 1, 0, 7, 9, 1, 7, 9, 8, 3, 0, 0, 0, 8, 9 ]
         
-        result = detectPulses(sampleData, risingThreshold, fallingThreshold, minSampleDuration, minPulseDuration, holdCount)
+        result = detectPulses(sampleData, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [8.0, 17.5])
 
 
