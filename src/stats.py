@@ -48,7 +48,7 @@ def calcAndPrintStats(matchIndex, allExpectedTimes, diffsAndErrors, toleranceSec
     errorBounds = [err  for diff,err in diffsAndErrors]
     
     firstExpectedTime = allExpectedTimes[matchIndex]
-    print "First observed flash/beep matched to one expected at %.3f seconds into the test video sequence." % firstExpectedTime
+    print "First observed flash/beep matched to one expected at %.3f seconds into the test video sequence. There were %d readings recorded." % (firstExpectedTime, len(diffs))
     
     avgOffsetMillis = secsToNearestMilli(calcMean(diffs))
     stdDevMillis    = secsToNearestMilli(calcVariance(diffs)**0.5)

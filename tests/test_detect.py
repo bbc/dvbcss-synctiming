@@ -21,7 +21,8 @@ and also code that does the pulse detection.
 """
 
 import sys
-sys.path.append("../src")
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../src")
 
 
 from detect import ConvertAtoB
@@ -136,12 +137,13 @@ class Test_detectPulses(unittest.TestCase):
 
         risingThreshold = 7
         fallingThreshold = 4
+        minPulseDuration = 0
         holdCount = 1
 
         #              IGNORE-              FIRST---                SECOND----------              IGNORE
         sampleData = [ 1, 8, 8, 0, 0, 0, 3, 8, 8, 7, 4, 1, 0, 1, 0, 7, 9, 1, 7, 9, 8, 3, 0, 0, 0, 8, 9 ]
         
-        result = detectPulses(sampleData, risingThreshold, fallingThreshold, holdCount)
+        result = detectPulses(sampleData, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [8.0, 17.5])
 
 
@@ -166,14 +168,28 @@ class Test_detectPulses(unittest.TestCase):
 
         risingThreshold = 6
         fallingThreshold = 3
+        minPulseDuration = 0
         holdCount = 0
 
-        result = detectPulses(envelope, risingThreshold, fallingThreshold, holdCount)
+        result = detectPulses(envelope, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [10.5, 18.0])
 
         holdCount = 1
-        result = detectPulses(envelope, risingThreshold, fallingThreshold, holdCount)
+        result = detectPulses(envelope, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
         self.assertEquals(result, [10.5, 18.0])
+
+    def testNoisySamplesScenario(self):
+
+        risingThreshold = 7
+        fallingThreshold = 4
+        minPulseDuration = 2
+        holdCount = 1
+
+        #              IGNORE-              FIRST---     |noise|     SECOND----------              IGNORE
+        sampleData = [ 1, 8, 8, 0, 0, 0, 3, 8, 8, 7, 4, 1, 10, 1, 0, 7, 9, 1, 7, 9, 8, 3, 0, 0, 0, 8, 9 ]
+        
+        result = detectPulses(sampleData, risingThreshold, fallingThreshold, minPulseDuration, holdCount)
+        self.assertEquals(result, [8.0, 17.5])
 
 
 
@@ -340,7 +356,8 @@ class Test_BeepFlashTimingDetector(unittest.TestCase):
 
         acStartNanos = 101000000
         acEndNanos   = 111000000
-        beepTimings = detector.samplesToBeepTimings(loSamples, hiSamples, acStartNanos, acEndNanos)
+        beepDurationSeconds = 3 / 1000 # one sample = 1 millisecond
+        beepTimings = detector.samplesToBeepTimings(loSamples, hiSamples, acStartNanos, acEndNanos, beepDurationSeconds)
         
         self.assertEquals(len(beepTimings), 1)
         ptsTime = beepTimings[0][0]
