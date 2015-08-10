@@ -90,10 +90,19 @@ fi
 
 # MP4 using H264 and AAC audio
 
+# NOTE: by default, FFMPEG (as available for Ubuntu 14.04) appears to introduce
+#       a 21.333ms delay to the audio (relative to the video) when writing
+#       to an MP4 container.
+#
+#       The 'itsoffset' option and the 'asyncts' audio filter work together to
+#       compensate for this by offsetting the audio and ensuring samples at the 
+#       beginning are trimmed. This ensures correct alignment.
+
 $FFMPEG -y \
- 	-r "$FPS" -i "$FRAME_FILE_PATTERN" -f wav -i "$WAV_FILE" \
+ 	-r "$FPS" -i "$FRAME_FILE_PATTERN" -f wav -itsoffset -0.0213333 -i "$WAV_FILE" \
  	-b 2M -r "$FPS" -vcodec libx264 -vf "fps=$FPS,format=yuv420p" \
  	-preset:v slow -profile:v baseline -level 3.1 -crf 23 \
+	-af asyncts=min_delta=0:compensate=1:first_pts=0 \
  	-ac 2 -ar 48k -ab 128k -acodec aac -strict -2 \
  	-map 0:v:0 -map 1:a:0 \
  	"$VIDEO_FILE".mp4
