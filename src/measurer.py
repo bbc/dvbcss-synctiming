@@ -198,11 +198,17 @@ class Measurer:
         for pinName in self.eventDurations:
             self.channels[self.pinMap[pinName]]["eventDuration"] = self.eventDurations[pinName]
 
+        # copy self.channels, but only the entries that are not 'None'
+        measuredChannels = []
+        for channel in self.channels:
+            if channel is not None:
+                measuredChannels.append(channel)
+
         # run detection process
         detector = detect.BeepFlashDetector(self.wcAcReqResp, self.syncClockTickRate, \
                                             self.wcSyncTimeCorrelations, dispersionFunc, \
                                             self.wcPrecisionNanos, self.acPrecisionNanos)
-        self.observedTimings = analyse.runDetection(detector, self.channels, self.dueStartTimeUsecs, self.dueFinishTimeUsecs)
+        self.observedTimings = analyse.runDetection(detector, measuredChannels, self.dueStartTimeUsecs, self.dueFinishTimeUsecs)
 
         self.testPackage = []
         for result in self.observedTimings:
@@ -286,31 +292,25 @@ def repackageSamples(pinsToMeasure, pinMap, nMilliBlocks, samples):
     for each activated pin, where that data are the high and low values observed
     on that pin over a millisecond
     :returns: the data channels for the sample data separated out per pin.  This is a
-    list of dictionaries, one per sampled pin.
+    list of dictionaries or None, one per sampled pin. It will be 'None' if nothing was sampled for that pin.
         A dictionary is { "pin": pin name, "isAudio": true or false,
             "min": list of sampled minimum values for that pin (each value is the minimum over a millisecond period)
             "max": list of sampled maximum values for that pin (each value is the maximum over same millisecond period) }
 
     """
 
-    possChannels = [None, None, None, None]
+    channels = [None, None, None, None]
     for pinName in pinsToMeasure:
-        possChannels[pinMap[pinName]] = ( { "pinName": pinName, "isAudio": isAudio(pinName), "min": [], "max": [] } )
-
-    # put channels in same order as that returned by arduino
-    channels = []
-    for channel in possChannels:
-        if channel != None:
-            channels.append(channel)
-
+        channels[pinMap[pinName]] = ( { "pinName": pinName, "isAudio": isAudio(pinName), "min": [], "max": [] } )
 
     i = 0
     for blk in range(0, nMilliBlocks):
         for channel in channels:
-            channel["max"].append(ord(samples[i]))
-            i += 1
-            channel["min"].append(ord(samples[i]))
-            i += 1
+            if channel != None:
+                channel["max"].append(ord(samples[i]))
+                i += 1
+                channel["min"].append(ord(samples[i]))
+                i += 1
 
     return channels
 
@@ -329,7 +329,7 @@ def captureAndPackageIntoChannels(f, pinsToMeasure, pinMap, wallClock):
         LIGHT_0, LIGHT_1, AUDIO_0 and AUDIO_1.
     :param pinMap: dictionary that maps from pin name to arduino pin number
     :param wallClock: the wall clock providing times for the CSS_WC protocol (wall clock protocol)
-    :returns a tuple: (data channels (see repackageSamples() )
+    :returns a tuple: (data channels (see repackageSamples() ),
         nanosecond time when sampling commenced,
         nanosecond time when sampling ended,
         round trip timing data taken just before sampling started
