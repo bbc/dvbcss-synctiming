@@ -78,14 +78,17 @@ Modify `CHANGELOG.md` e.g. using `vi`:
 
 #### 4. Create release branch
 
-Create new branch (locally, but set to track on origin)
+Create new branch (locally):
 
-    $ git checkout -b 'X.Y.Z' --track 'origin/X.Y.Z'
+    $ git checkout -b 'X.Y.Z'
+
+Update CHANGELOG.md to remove "latest" heading. Then commit.
+
     $ git commit -m "Release branch"
-    
-Push branch up to github:
 
-    $ git push origin 'X.Y.Z'
+Finally branch up to github (and set local repository to track upstream branch on origin):
+
+    $ git push -u origin 'X.Y.Z'
     
 
 #### 6. Create a new release on GitHub based on the new branch
