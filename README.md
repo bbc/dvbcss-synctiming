@@ -98,15 +98,12 @@ commands as root.
         $ pip install pyserial 
         $ pip install pillow
 
-2. Download and install [pydvbcss library](https://github.com/BBC/pydvbcss) from
-   GitHub (it is not yet available through PIP). This provides the
-   implementation of the DVB synchronisation protocols used by the PC software.
+2. Download and install pydvbcss library. It can now also be installed using PIP:
       
-        $ git clone https://github.com/BBC/pydvbcss.git
-        $ pip install cherrypy
-        $ pip install ws4py
-        $ cd pydvbcss
-        $ python setup.py install
+        $ pip install pydvbcss  
+
+   Alternatively, you can download the (pydvbcss sources](https://github.com/BBC/pydvbcss)
+   and install manually by following the instructions in pydvbcss's README.
 
 3. Install the *Arduino SDK* to get the USB drivers for communicating with
    the Arduino (even if you have already programmed the device (see below).
