@@ -2,7 +2,7 @@
 
 ## Latest
 
-* ...
+* Enhancement: Added support for fields (as opposed to frames) to the test sequence generator
 
 ## 0.3 : (02 Sep 2015) Flash/beep detection improvements, customisable test sequences and various bugfixes
 

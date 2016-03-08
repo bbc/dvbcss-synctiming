@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 #
 # Copyright 2015 British Broadcasting Corporation
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -43,34 +43,34 @@ except ImportError:
 def genFlashSequence(flashCentreTimesSecs, idealFlashDurationSecs, sequenceDurationSecs, frameRate, gapValue=(0,0,0), flashValue=(1.0,1.0,1.0)):
     """\
     Generates the pixel colour values needed for each frame to render flashes corresponding to the timings specified.
-    
+
     :param beepCentreTimeSecs: A list or iterable of the centre times of each beep (in seconds since the beginning of the sequence)
     :param idealFlashDurationSecs: ideal duration of a flash in seconds
     :param sequenceDurationSecs: total sequence duration in seconds
     :param sampleRateHz: The final output sample rate in Hz
     :param gapValue: The value for non flash pixels
     :param flashValue: The value for flash pixels
-    
+
     :returns: An iterable that generates the pixel colours for each frame starting with the first frame
     """
     flashDurationSamples = calcNearestDurationForExactNumberOfCycles(idealFlashDurationSecs, frameRate)
-    
+
     flashStartEndSamples = genSequenceStartEnds(flashCentreTimesSecs, flashDurationSamples, 1.0, frameRate)
 
     nSamples = sequenceDurationSecs * frameRate
-    
+
     def gapGen():
         while True:
             yield gapValue
-        
+
     def flashGen():
         while True:
             yield flashValue
 
     seqIter = genSequenceFromSampleIndices(flashStartEndSamples, gapGen, flashGen)
-    
+
     return itertools.islice(seqIter, 0, nSamples)
-   
+
 
 
 
@@ -87,11 +87,11 @@ class AspectPreservingCoordinateScaler(object):
     """\
     Converts coordinates from a bounding box (0,0) -> (inputWidth, inputHeight)
     to coordinates within another bounding box (0,0) -> (outputWidth, outputHeight)
-    
+
     Does so such that the aspect ratio is preserved and such that the input
     bounding box would be centred within the output bounding box.
     """
-    
+
     def __init__(self, (inputWidth, inputHeight), (outputWidth, outputHeight)):
         super(AspectPreservingCoordinateScaler,self).__init__()
 
@@ -101,12 +101,12 @@ class AspectPreservingCoordinateScaler(object):
 
         widthScale = float(outputWidth) / inputWidth
         heightScale = float(outputHeight) / inputHeight
-        
+
         self.scale = min(widthScale, heightScale)
 
         xGap = outputWidth - inputWidth*self.scale
         yGap = outputHeight - inputHeight*self.scale
-        
+
         self.xOffset = xGap / 2.0
         self.yOffset = yGap / 2.0
 
@@ -119,7 +119,6 @@ class AspectPreservingCoordinateScaler(object):
     def s(self, v):
         return v * self.scale
 
-
 def loadFont(sizePt):
     possibleFonts = [ "Arial.ttf", "arial.ttf", "FreeSans.ttf", "freesans.ttf" ]
 
@@ -128,7 +127,7 @@ def loadFont(sizePt):
             return ImageFont.truetype(fontName, int(sizePt))
         except IOError:
             pass
-            
+
     possibleFontFiles = [
         "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         "/usr/share/fonts/truetype/FreeSans.ttf",
@@ -140,14 +139,26 @@ def loadFont(sizePt):
         except IOError:
             pass
     raise RuntimeError("Cannot find a TTF font file.")
- 
- 
-def frameNumToTimecode(n, fps):
+
+
+FIELD_INDICATOR = [
+    unichr(0x25cb)+u"1",     # hollow circle, '1'
+    unichr(0x25cf)+u"2",     # filled circle, '2'
+]
+
+def frameNumToTimecode(n, fps, framesAreFields=False):
     f = n % fps
     s = (n / fps) % 60
     m = (n / fps / 60) % 60
     h = (n / fps / 60 / 60)
-    return "%02d:%02d:%02d:%02d" % (h,m,s,f)        
+
+    if framesAreFields:
+        fieldIndicator = u'  ' + FIELD_INDICATOR[f % 2]
+        f = f / 2
+    else:
+        fieldIndicator = ""
+
+    return "%02d:%02d:%02d:%02d%s" % (h,m,s,f, fieldIndicator)
 
 
 def precise_filled_pieslice(draw, xy, start, end, *options, **kwoptions):
@@ -157,11 +168,11 @@ def precise_filled_pieslice(draw, xy, start, end, *options, **kwoptions):
     """
     startInt = int(math.ceil(start))
     endInt   = int(math.floor(end))
-    
+
     draw.pieslice(xy, startInt, endInt, *options, **kwoptions)
 
     # draw triangular wedges for the final fraction of degree at the start and end
-    
+
     if len(xy) == 2:
         x1,y1 = xy[0]
         x2,y2 = xy[1]
@@ -174,26 +185,26 @@ def precise_filled_pieslice(draw, xy, start, end, *options, **kwoptions):
     centre = (x1+x2)/2.0, (y1+y2)/2.0
     xrad = abs((x2-x1)/2.0)
     yrad = abs((y2-y1)/2.0)
-    
+
     if start != startInt:
         p1 = centre[0] + xrad * math.cos(math.radians(start)), \
              centre[1] + xrad * math.sin(math.radians(start))
         p2 = centre[0] + xrad * math.cos(math.radians(startInt)), \
-             centre[1] + xrad * math.sin(math.radians(startInt)) 
+             centre[1] + xrad * math.sin(math.radians(startInt))
         draw.polygon([centre, p1, p2, centre], *options, **kwoptions)
-        
+
     if end != endInt:
         p1 = centre[0] + xrad * math.cos(math.radians(end)), \
              centre[1] + xrad * math.sin(math.radians(end))
         p2 = centre[0] + xrad * math.cos(math.radians(endInt)), \
-             centre[1] + xrad * math.sin(math.radians(endInt)) 
+             centre[1] + xrad * math.sin(math.radians(endInt))
         draw.polygon([centre, p1, p2, centre], *options, **kwoptions)
-        
 
-def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255)):
+
+def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255), FRAMES_AS_FIELDS=False):
     """\
     Generator that yields PIL Image objects representing video frames, one at a time
-    
+
     :param (widthPixels, heightPixels): desired dimensions (in pixels) of the image as a tuple
     :param flashColourGen: a list or iterable (e.g. generator) that returns the colour to use for the flashing box
     :param flashCOlourGen: a list or iterable (e.g. generator) that returns the colour to use for the pip train
@@ -205,14 +216,15 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
     :param GFX_COLOUR: colour for graphical indicators (except the pips) as (r,g,b) tuple
     :param title: title text label
     :param TITLE_COLOUR: colour for the title text as (r,g,b) tuple
-    
+    :param FRAMES_AS_FIELDS: false if frames will be used as frames. True if outputted frames will be encoded as fields.
+
     :returns: Generator that yields a PIL.Image object for every frame in sequence
     """
 
     # we're going to draw a larger (super sampled) image and then scale it down
     # to get smoothing (compensating for the lack of anti-aliased drawing functions
     # in PIL)
-    
+
     width = widthPixels * superSamplingScale
     height = heightPixels * superSamplingScale
 
@@ -223,15 +235,23 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
     # and use a scaling function to map to out actual dimensions
     scaler = AspectPreservingCoordinateScaler((160,90),(width,height))
 
-    # load a font for text    
+    # load a font for text
     font = loadFont(sizePt = scaler.s(5))
 
     WHITE=(255,255,255)
     BLACK=(0,0,0)
-    
+
+    if FRAMES_AS_FIELDS:
+        imageName = "field"
+        labelFps = FPS / 2
+    else:
+        imageName = "frame"
+        labelFps = FPS
+
+
     for frameNum in range(0,numFrames):
 
-        timecode = frameNumToTimecode(frameNum, FPS)
+        timecode = frameNumToTimecode(frameNum, FPS, framesAreFields=FRAMES_AS_FIELDS)
         timeSecs = float(frameNum) / FPS
         nextTimeSecs = float(frameNum+1) / FPS  # time of next frame after this
         durationTimecode = frameNumToTimecode(numFrames, FPS)
@@ -261,22 +281,22 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
         topLeft = scaler.xy((10, 4))
         draw.text(topLeft, timecode, font=font, fill=TEXT_COLOUR)
         topLeft = scaler.xy((10, 10))
-        draw.text(topLeft, "%06d of %d frames" % (frameNum, numFrames), font=font, fill=TEXT_COLOUR)
+        draw.text(topLeft, "%06d of %d %ss" % (frameNum, numFrames, imageName), font=font, fill=TEXT_COLOUR)
         topLeft = scaler.xy((10, 16))
         draw.text(topLeft, u"%08.3f \u2264 t < %08.3f secs" % (timeSecs, nextTimeSecs), font=font, fill=TEXT_COLOUR)
 
         topLeft = scaler.xy((10,65))
         draw.text(topLeft, "Duration: " + durationTimecode, font=font, fill=TEXT_COLOUR)
         topLeft = scaler.xy((10,70))
-        draw.text(topLeft, "%d fps" % FPS, font=font, fill=TEXT_COLOUR)
-        
+        draw.text(topLeft, "%d fps" % labelFps, font=font, fill=TEXT_COLOUR)
+
         # and more text labels, but this time right justified
         text = title
         w,h = font.getsize(text)
         topLeft = scaler.xy((150,4))
         topLeft = topLeft[0] - w, topLeft[1]
         draw.text(topLeft, text, font=font, fill=TITLE_COLOUR)
-        
+
         # draw an outer ring segment indicating the time period covered by the current frame
         topLeft = scaler.xy((105, 20))
         bottomRight = scaler.xy((155, 70))
@@ -288,7 +308,7 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
         topLeft = scaler.xy((108, 23))
         bottomRight = scaler.xy((152, 67))
         draw.ellipse(topLeft + bottomRight, outline=None, fill=BG_COLOUR)
-        
+
 
         # draw frame num ring
         topLeft = scaler.xy((110, 25))
@@ -314,28 +334,28 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
         LIM=FPS
         NUM_BLOBS = 2*LIM + 1
         blobSpacing = 150.0/NUM_BLOBS
-        
+
         for offset in range(-LIM, +LIM+1):
             left  = 80+blobSpacing*(offset-0.5)
             right = 80+blobSpacing*(offset+0.5)
-            
+
             topLeft     = scaler.xy(( left, 80 ))
             bottomRight = scaler.xy(( right, 85 ))
-            
+
             seqIndex = offset + frameNum
             if seqIndex >= 0 and seqIndex < numFrames:
                 colour = flashColsPipTrain[seqIndex]
                 draw.rectangle(topLeft + bottomRight, outline=None, fill = colour)
-            
+
             if offset == 0:
                 # draw blob above
-                topLeft     = scaler.xy(( left, 75 ))                
-                bottomRight = scaler.xy(( right, 80 ))            
+                topLeft     = scaler.xy(( left, 75 ))
+                bottomRight = scaler.xy(( right, 80 ))
                 draw.rectangle(topLeft + bottomRight, outline=None, fill = GFX_COLOUR)
-                
+
                 # and below
-                topLeft     = scaler.xy(( left, 85 ))          
-                bottomRight = scaler.xy(( right, 90 ))           
+                topLeft     = scaler.xy(( left, 85 ))
+                bottomRight = scaler.xy(( right, 90 ))
                 draw.rectangle(topLeft + bottomRight, outline=None, fill = GFX_COLOUR)
 
         # shrink the image using high quality downsampling
@@ -343,12 +363,7 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
             scalingMode = Image.LANCZOS
         except AttributeError:
             scalingMode = Image.BICUBIC
-            
+
         rescaledImage = img.resize((widthPixels,heightPixels), scalingMode)
 
-        yield rescaledImage    
-    
-    
-    
-
-
+        yield rescaledImage
