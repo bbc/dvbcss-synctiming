@@ -201,7 +201,7 @@ def precise_filled_pieslice(draw, xy, start, end, *options, **kwoptions):
         draw.polygon([centre, p1, p2, centre], *options, **kwoptions)
 
 
-def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255), FRAMES_AS_FIELDS=False):
+def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255), FRAMES_AS_FIELDS=False, frameSkipChecker=None):
     """\
     Generator that yields PIL Image objects representing video frames, one at a time
 
@@ -217,6 +217,7 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
     :param title: title text label
     :param TITLE_COLOUR: colour for the title text as (r,g,b) tuple
     :param FRAMES_AS_FIELDS: false if frames will be used as frames. True if outputted frames will be encoded as fields.
+    :param frameSkipChecker: None or a function that takes the frame number as input and returns True if the frame should not be generated (in which case None will be yielded in place of a frame image)
 
     :returns: Generator that yields a PIL.Image object for every frame in sequence
     """
@@ -250,6 +251,11 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
 
 
     for frameNum in range(0,numFrames):
+        if frameSkipChecker is not None:
+            shouldSkip=frameSkipChecker(frameNum)
+            if shouldSkip:
+                yield None
+                continue
 
         timecode = frameNumToTimecode(frameNum, FPS, framesAreFields=FRAMES_AS_FIELDS)
         timeSecs = float(frameNum) / FPS

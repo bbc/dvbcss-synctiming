@@ -215,6 +215,11 @@ if __name__ == "__main__":
         help="Filename pattern for writing PNG frames. Use printf style 'percent-d' syntax to include the frame number. Frames will not be written if this argument is provided")
 
     parser.add_argument(
+        "--skip-frame-if-exists", dest="SKIP_IF_EXISTS", action="store_true",
+        default=False,
+        help="If set, then do not generate frame images if they already exist on the disk. Default is to generate all, even if they are already on the disk.")
+
+    parser.add_argument(
         "--wav-filename", dest="AUDIO_FILENAME", action="store", nargs=1,
         type=str,
         default=[None],
@@ -265,6 +270,8 @@ if __name__ == "__main__":
         # internally we render each "field" as a full "frame"
         fps=fps*2
 
+    SKIP_IF_EXISTS = args.SKIP_IF_EXISTS
+
     seqBitLen = args.WINDOW_LEN[0]
     if args.DURATION[0] is None:
         sequenceDurationSecs = 2**seqBitLen - 1
@@ -302,6 +309,8 @@ if __name__ == "__main__":
     print "   Video frame dimensions:     %d x %d pixels" % pixelsSize
     print "   Audio sample rate:          %d Hz" % sampleRateHz
     print "   Filename for PNG frames:    %s " % (frameFilenames if frameFilenames is not None else "<< will not be saved >>")
+    if frameFilenames is not None and SKIP_IF_EXISTS:
+        print "                               (but will skip generating frames already on the disk)"
     print "   Filename for WAV audio:     %s " % (audioFilename if audioFilename is not None else "<< will not be saved >>")
     print "   Filename for JSON metadata: %s " % (metadataFilename if metadataFilename is not None else "<< will not be saved >>")
     print "   Text colour:                %d %d %d " % text_colour
@@ -372,17 +381,29 @@ if __name__ == "__main__":
         print "Generating video images..."
         numNumberSubstitutions = len(re.findall(r"%.?[0-9]*d", frameFilenames))
 
+        def genFrameFilename(n):
+            return frameFilenames % tuple([n] * numNumberSubstitutions)
+
+        if SKIP_IF_EXISTS:
+            skipChecker = lambda n : os.path.isfile(genFrameFilename(n))
+        else:
+            skipChecker = None
+
         # pass the flash sequence pixel colour generator to a new generator that
         # will yield a sequence of image frames
 
         numFrames = len(flashSequence)
         frames = genFrameImages(pixelsSize, flashSequence, pipTrainSequence, numFrames, fps, \
-            BG_COLOUR=bg_colour, GFX_COLOUR=gfx_colour, TEXT_COLOUR=text_colour, title=title_text, TITLE_COLOUR=title_colour, FRAMES_AS_FIELDS=FIELD_BASED )
+            BG_COLOUR=bg_colour, GFX_COLOUR=gfx_colour, TEXT_COLOUR=text_colour, title=title_text, TITLE_COLOUR=title_colour, \
+            FRAMES_AS_FIELDS=FIELD_BASED, frameSkipChecker=skipChecker )
         n=0
         for frame in frames:
-            print "    Generating and saving image %d of %d" % (n, numFrames-1)
-            filename = frameFilenames % tuple([n] * numNumberSubstitutions)
-            frame.save(filename, format="PNG")
+            filename = genFrameFilename(n)
+            if frame is not None:
+                print "    Generating and saving image %d of %d" % (n, numFrames-1)
+                frame.save(filename, format="PNG")
+            else:
+                print "    Skipping image %d of %d (already exists)" % (n, numFrames-1)
             n=n+1
     else:
         print "NOT generating video images (no filename provided)"

@@ -3,6 +3,8 @@
 ## Latest
 
 * Enhancement: Added support for fields (as opposed to frames) to the test sequence generator
+* Enhancement: Added support to test sequence generator for skipping generating frames already
+  on the disk, to allow resumption of lengthy generation jobs if interrupted.
 
 ## 0.3 : (02 Sep 2015) Flash/beep detection improvements, customisable test sequences and various bugfixes
 
