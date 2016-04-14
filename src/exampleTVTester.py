@@ -273,6 +273,8 @@ if __name__ == "__main__":
 
         print "Synced to timeline."
 
+        raw_input("Press RETURN once ready to begin measuring.")
+
         # finally check if dispersion is sane before proceeding
         currentDispersion = wallClockClient.algorithm.getCurrentDispersion()
         if currentDispersion > 1000000000*1.0:
