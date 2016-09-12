@@ -660,7 +660,7 @@ class BeepFlashDetector(object):
         # set it quite long to cope with backlight flicker issues
         holdTime = flashDurationSecs * 0.5    # half of the flash duration
         holdCount = int(holdTime * 1000)     # one sample = 1 millisecond
-	minFlashDuration = flashDurationSecs * 0.75
+	minFlashDuration = flashDurationSecs * 0.5
         minFlashCount = int(minFlashDuration * 1000)
         
         # run the detection
