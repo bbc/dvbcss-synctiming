@@ -246,7 +246,7 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
         tmpimg = Image.new("RGB", (width, height), color=BG_COLOUR)
         tmpdraw = ImageDraw.Draw(tmpimg)
         w,h = tmpdraw.multiline_textsize(segment_description_text, font=smallfont)
-        max_w, max_h = scaler.xy((140,15))
+        max_w, max_h = scaler.xy((140,13))
         
         shrink_factor = min(float(max_w) / w, float(max_h) / h, 1)
         smallfont = loadFont(sizePt = scaler.s(4*shrink_factor))
