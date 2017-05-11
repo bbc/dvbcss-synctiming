@@ -30,6 +30,9 @@ python libraries from the Python Package Index [PyPI](https://pypi.python.org/py
 
 	$ pip install pillow
 
+*Note: This now requires pillow **version 3.4 or later**. Add the `-U` option when
+running `pip install` to force an upgrade if you have an earlier version installed.*
+
 **ffmpeg** should be installed using your system's package manager or
 [downloaded direct](https://www.ffmpeg.org/)  as
 appropriate. On Debian systems (e.g. Ubuntu):
