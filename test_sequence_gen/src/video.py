@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 #
 # Copyright 2015 British Broadcasting Corporation
-#
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -201,7 +201,7 @@ def precise_filled_pieslice(draw, xy, start, end, *options, **kwoptions):
         draw.polygon([centre, p1, p2, centre], *options, **kwoptions)
 
 
-def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255), FRAMES_AS_FIELDS=False, frameSkipChecker=None):
+def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPipTrain, numFrames, FPS, superSamplingScale=8, BG_COLOUR=(0,0,0), TEXT_COLOUR=(255,255,255), GFX_COLOUR=(255,255,255), title="", TITLE_COLOUR=(255,255,255), FRAMES_AS_FIELDS=False, frameSkipChecker=None, segments=[]):
     """\
     Generator that yields PIL Image objects representing video frames, one at a time
 
@@ -218,7 +218,7 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
     :param TITLE_COLOUR: colour for the title text as (r,g,b) tuple
     :param FRAMES_AS_FIELDS: false if frames will be used as frames. True if outputted frames will be encoded as fields.
     :param frameSkipChecker: None or a function that takes the frame number as input and returns True if the frame should not be generated (in which case None will be yielded in place of a frame image)
-
+    :param segments: Array of dict structures describing segments with labels and descriptions. Each entry has following key/value pairs: "label":string label shown on the pie. "startSecs":number of seconds (including fractions) at which segment begins. "description":string - descriptive string given for the segment
     :returns: Generator that yields a PIL.Image object for every frame in sequence
     """
 
@@ -237,7 +237,27 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
     scaler = AspectPreservingCoordinateScaler((160,90),(width,height))
 
     # load a font for text
-    font = loadFont(sizePt = scaler.s(5))
+    font = loadFont(sizePt = scaler.s(4))
+    smallfont = loadFont(sizePt = scaler.s(4))
+    
+    # work out the segment description text, then check its size and adjust the fontsize to ensure it fits within bounding area
+    if segments:
+        segment_description_text = "\n".join(map(lambda seg : seg["description"], segments))
+        tmpimg = Image.new("RGB", (width, height), color=BG_COLOUR)
+        tmpdraw = ImageDraw.Draw(tmpimg)
+        w,h = tmpdraw.multiline_textsize(segment_description_text, font=smallfont)
+        max_w, max_h = scaler.xy((140,15))
+        
+        shrink_factor = min(float(max_w) / w, float(max_h) / h, 1)
+        smallfont = loadFont(sizePt = scaler.s(4*shrink_factor))
+    
+    poy = 0 # pie Y offset
+    dfy = 65 # duration and FPS labels Y offset
+    if segments:
+        poy = -10
+        dfy = 19
+
+
 
     WHITE=(255,255,255)
     BLACK=(0,0,0)
@@ -278,22 +298,22 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
         # draw text label explaining to attach light sensor to the flashing box
         topLeft     = scaler.xy((41, 37))
         draw.text(topLeft, "Use light detector", font=font, fill=TEXT_COLOUR)
-        topLeft     = scaler.xy((41, 42))
+        topLeft     = scaler.xy((41, 41))
         draw.text(topLeft, "on centre of", font=font, fill=TEXT_COLOUR)
-        topLeft     = scaler.xy((41, 47))
+        topLeft     = scaler.xy((41, 45))
         draw.text(topLeft, "this box", font=font, fill=TEXT_COLOUR)
 
         # draw text labels giving frame number, timecode and seconds covered by this frame
         topLeft = scaler.xy((10, 4))
         draw.text(topLeft, timecode, font=font, fill=TEXT_COLOUR)
-        topLeft = scaler.xy((10, 10))
+        topLeft = scaler.xy((10, 9))
         draw.text(topLeft, "%06d of %d %ss" % (frameNum, numFrames, imageName), font=font, fill=TEXT_COLOUR)
-        topLeft = scaler.xy((10, 16))
+        topLeft = scaler.xy((10, 14))
         draw.text(topLeft, u"%08.3f \u2264 t < %08.3f secs" % (timeSecs, nextTimeSecs), font=font, fill=TEXT_COLOUR)
 
-        topLeft = scaler.xy((10,65))
+        topLeft = scaler.xy((10,dfy))
         draw.text(topLeft, "Duration: " + durationTimecode, font=font, fill=TEXT_COLOUR)
-        topLeft = scaler.xy((10,70))
+        topLeft = scaler.xy((10,dfy+5))
         draw.text(topLeft, "%d fps" % labelFps, font=font, fill=TEXT_COLOUR)
 
         # and more text labels, but this time right justified
@@ -304,21 +324,21 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
         draw.text(topLeft, text, font=font, fill=TITLE_COLOUR)
 
         # draw an outer ring segment indicating the time period covered by the current frame
-        topLeft = scaler.xy((105, 20))
-        bottomRight = scaler.xy((155, 70))
+        topLeft = scaler.xy((105, 20+poy))
+        bottomRight = scaler.xy((155, 70+poy))
         angle1 = 360 * (frameNum % FPS) / FPS
         angle2 = 360 * ((frameNum % FPS) + 1) / FPS
         draw.pieslice(topLeft + bottomRight, start=270+angle1, end=270+angle2, outline=None, fill=GFX_COLOUR)
 
         # hollow it out to make the circle into a ring
-        topLeft = scaler.xy((108, 23))
-        bottomRight = scaler.xy((152, 67))
+        topLeft = scaler.xy((108, 23+poy))
+        bottomRight = scaler.xy((152, 67+poy))
         draw.ellipse(topLeft + bottomRight, outline=None, fill=BG_COLOUR)
 
 
         # draw frame num ring
-        topLeft = scaler.xy((110, 25))
-        bottomRight = scaler.xy((150, 65))
+        topLeft = scaler.xy((110, 25+poy))
+        bottomRight = scaler.xy((150, 65+poy))
         angle = 360 * (frameNum % FPS) / FPS
         if (frameNum / FPS) % 2 == 0:  # if this is an even second (0-0.9, 2-2.9, 4-4.9 etc)
             draw.pieslice(topLeft + bottomRight, start=270, end=270+angle, outline=None, fill=GFX_COLOUR)
@@ -326,16 +346,47 @@ def genFrameImages((widthPixels, heightPixels), flashColourGen, flashColourGenPi
             draw.pieslice(topLeft + bottomRight, start=270+angle, end=270+360, outline=None, fill=GFX_COLOUR)
 
         # hollow it out to make the circle into a ring
-        topLeft = scaler.xy((113, 28))
-        bottomRight = scaler.xy((147, 62))
+        topLeft = scaler.xy((113, 28+poy))
+        bottomRight = scaler.xy((147, 62+poy))
         draw.ellipse(topLeft + bottomRight, outline=None, fill=BG_COLOUR)
+        
+        # draw outer for segments
+        if segments:
+            topLeft = scaler.xy((115-0.25, 30+poy-0.25))
+            bottomRight = scaler.xy((145+0.25, 60+poy+0.25))
+            draw.ellipse(topLeft + bottomRight, fill=WHITE, outline=None)
+            topLeft = scaler.xy((115, 30+poy))
+            bottomRight = scaler.xy((145, 60+poy))
+            draw.ellipse(topLeft + bottomRight, fill=BLACK, outline=None)
 
         # draw progress pie
-        topLeft = scaler.xy((115, 30))
-        bottomRight = scaler.xy((145, 60))
+        topLeft = scaler.xy((115, 30+poy))
+        bottomRight = scaler.xy((145, 60+poy))
         angle = 360.0*frameNum/numFrames
         precise_filled_pieslice(draw, topLeft + bottomRight, start=270, end=270+angle, outline=None, fill=GFX_COLOUR)
 
+        # draw segments over the pieslice
+        if segments:
+            for i in range(0, len(segments)):
+                angle = math.radians(270 + 360.0*segments[i]["startSecs"]/numFrames*FPS)
+                centre = scaler.xy((130,45+poy))
+                armEnd = scaler.xy((130 + 15*math.cos(angle), 45+poy + 15*math.sin(angle)))
+                draw.line([centre, armEnd], fill=WHITE, width=int(scaler.s(0.25)))
+                
+                segStartFrame = segments[i]["startSecs"] * FPS
+                nextStartFrame = segments[(i+1) % len(segments)]["startSecs"] * FPS
+                if nextStartFrame <= segStartFrame:
+                    nextStartFrame += numFrames
+                midAngle = math.radians(270 + 360.0* (segStartFrame+nextStartFrame)/2/numFrames)
+                w,h = font.getsize(segments[i]["label"])
+                centre = scaler.xy((130 + 15*math.cos(midAngle)*0.7, 45+poy + 15*math.sin(midAngle)*0.7))
+                topLeft = centre[0] - w/2, centre[1] - h/2
+                draw.text(topLeft, segments[i]["label"], fill=WHITE, font=font)
+
+            # draw segment long labels
+            topLeft = scaler.xy((10,61))
+            draw.multiline_text(topLeft, segment_description_text, fill=WHITE, font=smallfont)
+        
         # draw pulse train at the bottom
         LIM=FPS
         NUM_BLOBS = 2*LIM + 1

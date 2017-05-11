@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 #
 # Copyright 2015 British Broadcasting Corporation
-#
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -145,11 +145,16 @@ def parseRGB(arg):
         g = int(match.group(2))
         b = int(match.group(3))
         if r<0 or r>255 or g<0 or g>255 or b<0 or b>255:
-            print "XXX"
             raise ValueError("Colour values must be between 0 and 255 (inclusive)")
         else:
             return r,g,b
 
+def parseSEGMENT(arg):
+    match = re.match(r"^([^:]+):([0-9]+(?:\.[0-9]*)?):(.+)$", arg)
+    if not match:
+        raise ValueError("Segment argument not in expected format L:T:D where L = label text. T = Start time in seconds and fractions of a second. D - description text")
+    else:
+        return match.group(1), float(match.group(2)), match.group(3)
 
 if __name__ == "__main__":
 
@@ -261,6 +266,13 @@ if __name__ == "__main__":
         default=[(255,255,255)],
         help="Colour for the visual indicator elements (moving blocks etc) as R,G,B each between 0 and 255. Default=\"255,255,255\" (white)")
 
+    parser.add_argument(
+        "--segments", dest="SEGMENTS", action="store", nargs="*",
+        type=parseSEGMENT,
+        default=[],
+        help="List one or more segments on the time progress pie. Each argument should be <label>:<start_time_secs>:<description>"
+    )
+
     args = parser.parse_args()
 
     fps = args.FPS[0]
@@ -321,6 +333,12 @@ if __name__ == "__main__":
         print "   Title colour:               %d %d %d " % title_colour
     else:
         print "   No title."
+    if args.SEGMENTS:
+        print "    And with segments marked on the progress pie:"
+        for i in range(0,len(args.SEGMENTS)):
+            print "        Segment starting at t=%f secs" % args.SEGMENTS[i][1]
+            print "            Pie label:   %s" % args.SEGMENTS[i][0]
+            print "            Description: %s" % args.SEGMENTS[i][2]
     print ""
 
     # -----------------------------------------------------------------------
@@ -391,11 +409,17 @@ if __name__ == "__main__":
 
         # pass the flash sequence pixel colour generator to a new generator that
         # will yield a sequence of image frames
+        
+        segments = map(lambda (label,startSecs,description) : {
+            "startSecs": startSecs,
+            "label": label,
+            "description": label+": "+description
+        }, args.SEGMENTS)
 
         numFrames = len(flashSequence)
         frames = genFrameImages(pixelsSize, flashSequence, pipTrainSequence, numFrames, fps, \
             BG_COLOUR=bg_colour, GFX_COLOUR=gfx_colour, TEXT_COLOUR=text_colour, title=title_text, TITLE_COLOUR=title_colour, \
-            FRAMES_AS_FIELDS=FIELD_BASED, frameSkipChecker=skipChecker )
+            FRAMES_AS_FIELDS=FIELD_BASED, frameSkipChecker=skipChecker, segments=segments )
         n=0
         for frame in frames:
             filename = genFrameFilename(n)
