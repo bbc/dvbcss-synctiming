@@ -309,7 +309,7 @@ if __name__ == "__main__":
     for filename, purpose in [ (frameFilenames,   frameLabel+" images"),
                                (audioFilename,    "WAV file"),
                                (metadataFilename, "metadata JSON file") ]:
-        if filename is not None and not os.path.isdir(os.path.dirname(filename)):
+        if filename is not None and not os.path.isdir(os.path.abspath(os.path.dirname(filename))):
             sys.stderr.write("\nCould not find output directory for "+purpose+".\nPlease check it exists and create it if necessary.\n\n")
             sys.exit(1)
 
